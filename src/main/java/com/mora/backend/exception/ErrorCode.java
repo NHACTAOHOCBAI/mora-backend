@@ -12,7 +12,10 @@ public enum ErrorCode {
     INVALID_PASSWORD(1004, "Mật khẩu không hợp lệ", HttpStatus.BAD_REQUEST),
     USER_NOT_FOUND(1005, "Không tìm thấy người dùng", HttpStatus.NOT_FOUND),
     UNAUTHENTICATED(1006, "Không thể xác thực danh tính", HttpStatus.UNAUTHORIZED),
-    UNAUTHORIZED(1007, "Bạn không có quyền truy cập chức năng này", HttpStatus.FORBIDDEN)
+    UNAUTHORIZED(1007, "Bạn không có quyền truy cập chức năng này", HttpStatus.FORBIDDEN),
+    DOCUMENT_NOT_FOUND(1008, "Không tìm thấy tài liệu", HttpStatus.NOT_FOUND),
+    FILE_UPLOAD_FAILED(1009, "Tải file lên hệ thống thất bại", HttpStatus.INTERNAL_SERVER_ERROR),
+    INVALID_FILE_FORMAT(1010, "Định dạng file không hợp lệ, chỉ hỗ trợ PDF", HttpStatus.BAD_REQUEST)
     ;
 
     private final int code;
