@@ -1,0 +1,27 @@
+package com.mora.backend.exception;
+
+import org.springframework.http.HttpStatus;
+import lombok.Getter;
+
+@Getter
+public enum ErrorCode {
+    UNCATEGORIZED_EXCEPTION(9999, "Lỗi không xác định", HttpStatus.INTERNAL_SERVER_ERROR),
+    INVALID_KEY(1001, "Uncategorized error key", HttpStatus.BAD_REQUEST),
+    USER_EXISTED(1002, "Người dùng đã tồn tại", HttpStatus.BAD_REQUEST),
+    USERNAME_INVALID(1003, "Tên đăng nhập không hợp lệ", HttpStatus.BAD_REQUEST),
+    INVALID_PASSWORD(1004, "Mật khẩu không hợp lệ", HttpStatus.BAD_REQUEST),
+    USER_NOT_FOUND(1005, "Không tìm thấy người dùng", HttpStatus.NOT_FOUND),
+    UNAUTHENTICATED(1006, "Không thể xác thực danh tính", HttpStatus.UNAUTHORIZED),
+    UNAUTHORIZED(1007, "Bạn không có quyền truy cập chức năng này", HttpStatus.FORBIDDEN)
+    ;
+
+    private final int code;
+    private final String message;
+    private final HttpStatus statusCode;
+
+    ErrorCode(int code, String message, HttpStatus statusCode) {
+        this.code = code;
+        this.message = message;
+        this.statusCode = statusCode;
+    }
+}
