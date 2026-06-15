@@ -9,9 +9,10 @@ public interface DocumentService {
      * Upload tài liệu lên Cloud và bóc tách văn bản từng trang để lưu vào CSDL.
      *
      * @param file File tải lên
+     * @param spaceId ID của Space chứa tài liệu
      * @return DTO chứa thông tin tài liệu đã lưu
      */
-    DocumentResponse uploadAndProcessDocument(MultipartFile file);
+    DocumentResponse uploadAndProcessDocument(MultipartFile file, Long spaceId);
 
     /**
      * Lấy thông tin chi tiết tài liệu kèm nội dung các trang.

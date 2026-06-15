@@ -13,25 +13,22 @@ import java.util.ArrayList;
 import java.util.List;
 
 @Entity
-@Table(name = "documents")
+@Table(name = "spaces")
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class Document {
+public class Space {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "file_name", nullable = false)
-    private String fileName;
+    @Column(name = "name", nullable = false)
+    private String name;
 
-    @Column(name = "file_type", nullable = false)
-    private String fileType;
-
-    @Column(name = "storage_url", nullable = false, length = 1024)
-    private String storageUrl;
+    @Column(name = "description", length = 1024)
+    private String description;
 
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
@@ -41,11 +38,7 @@ public class Document {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "space_id")
-    private Space space;
-
-    @OneToMany(mappedBy = "document", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(mappedBy = "space", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
-    private List<DocumentPage> pages = new ArrayList<>();
+    private List<Document> documents = new ArrayList<>();
 }

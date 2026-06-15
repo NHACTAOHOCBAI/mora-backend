@@ -24,9 +24,11 @@ public class DocumentController {
 
     @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @Operation(summary = "Tải lên file PDF và tự động bóc tách nội dung từng trang")
-    public ResponseEntity<DocumentResponse> uploadDocument(@RequestParam("file") MultipartFile file) {
-        log.info("Received request to upload document: {}", file.getOriginalFilename());
-        DocumentResponse response = documentService.uploadAndProcessDocument(file);
+    public ResponseEntity<DocumentResponse> uploadDocument(
+            @RequestParam("file") MultipartFile file,
+            @RequestParam("spaceId") Long spaceId) {
+        log.info("Received request to upload document: {} for space ID: {}", file.getOriginalFilename(), spaceId);
+        DocumentResponse response = documentService.uploadAndProcessDocument(file, spaceId);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 

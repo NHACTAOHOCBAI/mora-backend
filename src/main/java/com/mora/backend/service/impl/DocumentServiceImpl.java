@@ -7,6 +7,8 @@ import com.mora.backend.model.dto.response.DocumentPageResponse;
 import com.mora.backend.model.dto.response.DocumentResponse;
 import com.mora.backend.model.entity.Document;
 import com.mora.backend.model.entity.DocumentPage;
+import com.mora.backend.model.entity.Space;
+import com.mora.backend.repository.SpaceRepository;
 import com.mora.backend.repository.DocumentPageRepository;
 import com.mora.backend.repository.DocumentRepository;
 import com.mora.backend.service.DocumentService;
@@ -33,10 +35,18 @@ public class DocumentServiceImpl implements DocumentService {
     private final StorageService storageService;
     private final DocumentRepository documentRepository;
     private final DocumentPageRepository documentPageRepository;
+    private final SpaceRepository spaceRepository;
 
     @Override
     @Transactional
-    public DocumentResponse uploadAndProcessDocument(MultipartFile file) {
+    public DocumentResponse uploadAndProcessDocument(MultipartFile file, Long spaceId) {
+        // Validation: Verify Space exists
+        Space space = spaceRepository.findById(spaceId)
+                .orElseThrow(() -> {
+                    log.warn("Space with ID {} not found for document upload", spaceId);
+                    return new AppException(ErrorCode.SPACE_NOT_FOUND);
+                });
+
         // Validation: Verify if file is PDF
         String contentType = file.getContentType();
         String filename = file.getOriginalFilename();
@@ -60,6 +70,7 @@ public class DocumentServiceImpl implements DocumentService {
                 .fileName(filename)
                 .fileType("pdf")
                 .storageUrl(storageUrl)
+                .space(space)
                 .build();
         document = documentRepository.save(document);
 
