@@ -2,7 +2,7 @@
 
 Mora Backend là dịch vụ máy chủ được phát triển trên nền tảng **Java Spring Boot**, đóng vai trò xử lý logic nghiệp vụ, quản lý cơ sở dữ liệu và tích hợp lưu trữ đám mây cho dự án **Mora - AI-Powered Social Learning Network** (Mạng xã hội học tập nhóm tích hợp AI thế hệ mới với cơ chế Source-Grounded AI tương tự NotebookLM).
 
-Dự án hiện tại hỗ trợ các tính năng cốt lõi cho **Giai đoạn 1**: Pipeline xử lý tài liệu, bóc tách nội dung PDF theo trang hỗ trợ định vị nguồn trích dẫn trực quan, tích hợp hệ thống lưu trữ Cloud Storage (Supabase) và cơ sở dữ liệu PostgreSQL.
+Dự án hiện tại hỗ trợ các tính năng cốt lõi cho **Giai đoạn 1**: Pipeline xử lý tài liệu, bóc tách nội dung PDF theo trang, tích hợp hệ thống lưu trữ Cloud Storage (Supabase), cơ sở dữ liệu PostgreSQL, và tích hợp mô hình AI Gemini qua LangChain4j hỗ trợ hỏi đáp kèm định vị nguồn trích dẫn và lưu trữ lịch sử cuộc trò chuyện.
 
 ---
 
@@ -14,6 +14,7 @@ Dự án hiện tại hỗ trợ các tính năng cốt lõi cho **Giai đoạn 
 *   **PostgreSQL 16** - Hệ quản trị cơ sở dữ liệu quan hệ chính.
 *   **Supabase Storage** - Giải pháp lưu trữ Cloud Object Storage quản lý tệp tin tài liệu gốc.
 *   **Apache PDFBox 3.0.3** - Thư viện bóc tách và phân tích dữ liệu văn bản từ file PDF theo trang.
+*   **LangChain4j 0.31.0** - Thư viện tích hợp LLM chính, kết nối với Google Gemini API, hỗ trợ AI Services, System/User Prompts và Structured Outputs (JSON Schema).
 *   **Lombok** - Tự sinh code Boilerplate (Constructor, Getter/Setter, Builder, Logging).
 *   **Springdoc OpenAPI v2.8.5** - Tự động sinh tài liệu API (Swagger UI).
 
@@ -25,11 +26,11 @@ Dự án tuân thủ mô hình **Package-by-Layer** kết hợp phân tách logi
 
 ```text
 com.mora.backend
-├── config/             # Cấu hình Spring Boot (CORS, OpenApi, Jackson, JPA...)
+├── config/             # Cấu hình Spring Boot (CORS, OpenApi, Jackson, JPA, Gemini...)
 ├── controller/         # REST API Controllers (Nhận/trả dữ liệu và điều hướng, không xử lý logic)
 ├── exception/          # Quản lý và xử lý lỗi tập trung toàn cục (Global Exception Handler)
 ├── model/              # Quản lý cấu trúc dữ liệu
-│   ├── entity/         # Đối tượng Entity ánh xạ trực tiếp xuống DB (Document, DocumentPage...)
+│   ├── entity/         # Đối tượng Entity ánh xạ trực tiếp xuống DB (Document, DocumentPage, ChatMessage...)
 │   └── dto/            # Data Transfer Object (DTO)
 │       ├── request/    # DTO nhận từ REST Client
 │       └── response/   # DTO trả về REST Client
@@ -37,8 +38,10 @@ com.mora.backend
 ├── service/            # Tầng xử lý nghiệp vụ chính (Business Logic)
 │   ├── DocumentService.java
 │   ├── StorageService.java
-│   └── impl/           # Hiện thực chi tiết (DocumentServiceImpl, SupabaseStorageServiceImpl)
-└── util/               # Các class tiện ích dùng chung (Date, String...)
+│   ├── ChatService.java
+│   ├── SpaceService.java
+│   └── impl/           # Hiện thực chi tiết (DocumentServiceImpl, ChatServiceImpl, SpaceServiceImpl...)
+└── util/               # Các class tiện ích dùng chung
 ```
 
 ---
@@ -46,13 +49,17 @@ com.mora.backend
 ## 🚀 Tính năng Hiện tại (Current Features)
 
 1.  **Pipeline Xử lý PDF:**
-    *   Tự động tải tài liệu gốc định dạng PDF lên Supabase Cloud Storage.
+    *   Tải tài liệu gốc định dạng PDF lên Supabase Cloud Storage.
     *   Sử dụng **Apache PDFBox** để bóc tách nội dung văn bản (text extraction) độc lập theo từng trang (Page-by-page mapping).
-    *   Lưu thông tin metadata của tài liệu và nội dung chi tiết từng trang vào PostgreSQL phục vụ cho các câu hỏi ngữ cảnh (Source-Grounded AI).
-2.  **API Quản lý Tài liệu:**
-    *   Tải lên tài liệu mới.
-    *   Xem chi tiết nội dung tài liệu theo từng trang.
-    *   Xóa tài liệu (Đồng thời xóa trên DB và Cloud Storage).
+    *   Lưu thông tin metadata của tài liệu và nội dung chi tiết từng trang vào PostgreSQL.
+2.  **Tích hợp AI Engine (Gemini & LangChain4j):**
+    *   **Hỏi đáp Source-Grounded (RAG):** Trả lời câu hỏi của người dùng dựa trên ngữ cảnh tài liệu (độc lập hoặc toàn bộ Space).
+    *   **Trích dẫn trang (Citations):** Ép đầu ra cấu trúc để Gemini trả về danh sách trích dẫn (quote gốc trong file PDF, số trang, mã tài liệu).
+    *   **Rút gọn câu hỏi (Condense Question):** Tự động gom lịch sử trò chuyện trong DB và câu hỏi mới của người dùng thành một câu độc lập trước khi gửi cho LLM.
+    *   **Công cụ học tập thông minh (Study Helper):** Tự động tạo bản Tóm tắt (Summary) học thuật và bộ câu hỏi ôn tập (Flashcards) dưới dạng JSON từ tài liệu.
+3.  **Lưu trữ Lịch sử Trò chuyện:**
+    *   Tự động lưu lại các tin nhắn trao đổi (User & Assistant) vào DB PostgreSQL.
+    *   Cung cấp các API REST để lấy lịch sử cuộc trò chuyện và dọn dẹp (xóa) lịch sử trò chuyện của từng tài liệu/Space.
 
 ---
 
@@ -62,9 +69,16 @@ Sau khi khởi chạy ứng dụng thành công, tài liệu Swagger UI sẽ kh�
 👉 **[http://localhost:8080/swagger-ui.html](http://localhost:8080/swagger-ui.html)**
 
 ### Các Endpoint chính:
-*   `POST /api/documents/upload` - Tải lên file PDF và tự động bóc tách nội dung từng trang (`multipart/form-data`).
-*   `GET /api/documents/{id}` - Lấy thông tin chi tiết tài liệu kèm nội dung văn bản các trang.
-*   `DELETE /api/documents/{id}` - Xóa tài liệu khỏi hệ thống lưu trữ Cloud và Cơ sở dữ liệu.
+*   `POST /api/documents/upload` - Tải lên file PDF và bóc tách nội dung từng trang.
+*   `GET /api/documents/{id}` - Lấy thông tin chi tiết tài liệu kèm các trang.
+*   `DELETE /api/documents/{id}` - Xóa tài liệu khỏi hệ thống.
+*   `POST /api/documents/{id}/generate-study-notes` - Sinh tóm tắt & Flashcards cho tài liệu bằng AI.
+*   `POST /api/chat` - Hỏi đáp với tài liệu cụ thể.
+*   `POST /api/chat/space` - Hỏi đáp trên toàn bộ Không gian học tập (nhiều tài liệu).
+*   `GET /api/chat/document/{documentId}` - Lấy lịch sử chat của tài liệu.
+*   `GET /api/chat/space/{spaceId}` - Lấy lịch sử chat của Space.
+*   `DELETE /api/chat/document/{documentId}` - Xóa lịch sử chat của tài liệu.
+*   `DELETE /api/chat/space/{spaceId}` - Xóa lịch sử chat của Space.
 
 ---
 
@@ -83,18 +97,18 @@ docker compose up -d
 ```
 
 ### 3. Cấu hình Ứng dụng
-Xem hoặc chỉnh sửa các thông số kết nối Database và Cloud Storage tại [application.properties](file:///c:/Users/phucnd/Desktop/Mora/mora-backend/src/main/resources/application.properties):
+Tạo file `.env` ở thư mục gốc của backend (hoặc cấu hình các biến môi trường trực tiếp) dựa trên file `.env.example`:
 
 ```properties
-# Database
-spring.datasource.url=jdbc:postgresql://localhost:5433/mora_db
-spring.datasource.username=postgres
-spring.datasource.password=postgres
-
-# Supabase Storage Configuration
-supabase.url=https://<your-supabase-project>.supabase.co
-supabase.key=<your-supabase-service-role-key>
-supabase.bucket=mora-documents
+DB_URL=jdbc:postgresql://localhost:5433/mora_db
+DB_USERNAME=postgres
+DB_PASSWORD=postgres
+SUPABASE_URL=https://your-supabase-project.supabase.co
+SUPABASE_KEY=your-supabase-service-role-key
+SUPABASE_BUCKET=mora-documents
+GEMINI_API_KEY=your-gemini-api-key
+GEMINI_MODEL_NAME=gemini-1.5-flash
+GEMINI_TEMPERATURE=0.0
 ```
 
 ### 4. Khởi chạy Ứng dụng
@@ -114,7 +128,7 @@ Sử dụng Maven Wrapper có sẵn để chạy ứng dụng:
 
 ## ✍️ Quy tắc Code (Coding Rules)
 
-Khi tham gia đóng góp mã nguồn cho dự án, vui lòng tuân thủ các nguyên tắc được định nghĩa chi tiết tại [rule.md](file:///c:/Users/phucnd/Desktop/Mora/mora-backend/rule.md) (hoặc xem tóm tắt bên dưới):
+Khi tham gia đóng góp mã nguồn cho dự án, vui lòng tuân thủ các nguyên tắc được định nghĩa chi tiết tại [rule.md](file:///c:/Users/phucnd/Desktop/Mora/mora-backend/rule.md):
 *   **Dependency Injection:** Tuyệt đối **KHÔNG** dùng `@Autowired` trực tiếp trên Field. Hãy dùng **Constructor Injection** (Khuyên dùng `@RequiredArgsConstructor` kết hợp thuộc tính `final`).
 *   **Request/Response & DTO:** Controller **KHÔNG** nhận hoặc trả về trực tiếp các Entity. Phải thông qua các đối tượng DTO chuyên biệt.
 *   **Transaction:** Đặt `@Transactional` ở tầng Service Implementation. Các phương thức đọc dữ liệu nên dùng `@Transactional(readOnly = true)`.

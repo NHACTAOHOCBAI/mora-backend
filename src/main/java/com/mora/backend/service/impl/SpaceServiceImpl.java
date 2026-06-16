@@ -26,15 +26,12 @@ public class SpaceServiceImpl implements SpaceService {
     @Override
     @Transactional
     public SpaceResponse createSpace(SpaceCreateRequest request) {
-        log.info("Creating a new space with name: {}", request.getName());
-        
         Space space = Space.builder()
                 .name(request.getName())
                 .description(request.getDescription())
                 .build();
         
         space = spaceRepository.save(space);
-        log.info("Successfully created space with ID: {}", space.getId());
         
         return convertToSpaceResponse(space);
     }
@@ -42,7 +39,6 @@ public class SpaceServiceImpl implements SpaceService {
     @Override
     @Transactional(readOnly = true)
     public List<SpaceResponse> getAllSpaces() {
-        log.info("Fetching all spaces");
         return spaceRepository.findAll().stream()
                 .map(this::convertToSpaceResponse)
                 .toList();
@@ -51,8 +47,6 @@ public class SpaceServiceImpl implements SpaceService {
     @Override
     @Transactional(readOnly = true)
     public SpaceDetailResponse getSpaceById(Long id) {
-        log.info("Fetching details of space ID: {}", id);
-        
         Space space = spaceRepository.findById(id)
                 .orElseThrow(() -> {
                     log.warn("Space with ID {} not found", id);
@@ -83,8 +77,6 @@ public class SpaceServiceImpl implements SpaceService {
     @Override
     @Transactional
     public void deleteSpace(Long id) {
-        log.info("Deleting space ID: {}", id);
-        
         Space space = spaceRepository.findById(id)
                 .orElseThrow(() -> {
                     log.warn("Space with ID {} not found for deletion", id);
@@ -92,7 +84,6 @@ public class SpaceServiceImpl implements SpaceService {
                 });
 
         spaceRepository.delete(space);
-        log.info("Successfully deleted space with ID: {}", id);
     }
 
     private SpaceResponse convertToSpaceResponse(Space space) {

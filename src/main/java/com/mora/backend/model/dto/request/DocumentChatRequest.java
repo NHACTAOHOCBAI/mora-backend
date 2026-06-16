@@ -6,6 +6,7 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import java.util.List;
 
 @Data
 @Builder
@@ -17,4 +18,6 @@ public class DocumentChatRequest {
 
     @NotBlank(message = "Câu hỏi không được để trống")
     private String question;
+
+    private List<ChatMessageDto> history;
 }

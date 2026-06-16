@@ -107,11 +107,9 @@ public class DocumentServiceImpl implements DocumentService {
         document = documentRepository.save(document);
 
         // 3. Process PDF pages text extraction
-        log.info("Extracting text from PDF file '{}'...", filename);
         List<DocumentPage> pages = new ArrayList<>();
         try (PDDocument pdfDocument = Loader.loadPDF(file.getBytes())) {
             int pageCount = pdfDocument.getNumberOfPages();
-            log.info("PDF file has {} pages", pageCount);
             
             PDFTextStripper textStripper = new PDFTextStripper();
             for (int i = 1; i <= pageCount; i++) {
@@ -141,7 +139,6 @@ public class DocumentServiceImpl implements DocumentService {
         // 4. Save all extracted pages
         documentPageRepository.saveAll(pages);
         document.setPages(pages);
-        log.info("Successfully processed and saved document with ID: {} and {} pages", document.getId(), pages.size());
 
         // 5. Convert and return Response DTO
         return convertToDocumentResponse(document);
@@ -201,14 +198,11 @@ public class DocumentServiceImpl implements DocumentService {
 
         // 2. Delete document from database (cascade deletes all related pages)
         documentRepository.delete(document);
-        log.info("Successfully deleted document with ID: {} and its pages", id);
     }
 
     @Override
     @Transactional
     public DocumentDetailResponse generateStudyNotes(Long id) {
-        log.info("Generating study notes (summary & flashcards) for document ID: {}", id);
-
         Document document = documentRepository.findById(id)
                 .orElseThrow(() -> {
                     log.warn("Document with ID {} not found for study notes generation", id);
@@ -217,7 +211,6 @@ public class DocumentServiceImpl implements DocumentService {
 
         // Nếu đã có sẵn thì không cần sinh lại
         if (document.getSummary() != null && document.getFlashcards() != null) {
-            log.info("Study notes already exist for document ID: {}, returning from database", id);
             return getDocumentById(id);
         }
 
@@ -240,7 +233,6 @@ public class DocumentServiceImpl implements DocumentService {
 
         try {
             String rawOutput = helper.generateStudyNotes(context);
-            log.info("Received raw output from Gemini for study notes generation");
 
             // Phân tách tóm tắt và flashcard
             String summary = "";
@@ -266,7 +258,6 @@ public class DocumentServiceImpl implements DocumentService {
             document.setFlashcards(flashcards);
             documentRepository.save(document);
 
-            log.info("Successfully generated and saved study notes for document ID: {}", id);
         } catch (Exception e) {
             log.error("Failed to generate study notes using Gemini API", e);
             throw new RuntimeException("Lỗi sinh tóm tắt hoặc flashcard bằng AI: " + e.getMessage(), e);

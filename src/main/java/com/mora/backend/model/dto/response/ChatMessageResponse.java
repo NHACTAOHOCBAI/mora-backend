@@ -4,15 +4,19 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class DocumentChatResponse {
-    private boolean answerFound;
-    private String answer;
+public class ChatMessageResponse {
+    private Long id;
+    private String sender;
+    private String text;
+    private LocalDateTime timestamp;
     private List<Citation> citations;
     private String condensedQuestion;
 
@@ -22,6 +26,7 @@ public class DocumentChatResponse {
     @AllArgsConstructor
     public static class Citation {
         private String quote;
+        private Long documentId;
         private Integer pageNumber;
     }
 }

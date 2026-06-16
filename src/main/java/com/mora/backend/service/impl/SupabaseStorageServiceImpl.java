@@ -40,7 +40,6 @@ public class SupabaseStorageServiceImpl implements StorageService {
         String uploadUrl = String.format("%s/storage/v1/object/%s/%s", supabaseUrl, bucketName, uniqueFilename);
 
         try {
-            log.info("Uploading file '{}' to Supabase Storage bucket '{}' as '{}'...", originalFilename, bucketName, uniqueFilename);
             byte[] fileBytes = file.getBytes();
 
             restClient.post()
@@ -54,7 +53,6 @@ public class SupabaseStorageServiceImpl implements StorageService {
 
             // Public URL: {supabaseUrl}/storage/v1/object/public/{bucket}/{filename}
             String publicUrl = String.format("%s/storage/v1/object/public/%s/%s", supabaseUrl, bucketName, uniqueFilename);
-            log.info("File uploaded successfully. Public URL: {}", publicUrl);
             return publicUrl;
 
         } catch (IOException e) {
@@ -70,14 +68,12 @@ public class SupabaseStorageServiceImpl implements StorageService {
     public void delete(String fileName) {
         String deleteUrl = String.format("%s/storage/v1/object/%s/%s", supabaseUrl, bucketName, fileName);
         try {
-            log.info("Deleting file '{}' from Supabase Storage...", fileName);
             restClient.delete()
                     .uri(deleteUrl)
                     .header("Authorization", "Bearer " + supabaseKey)
                     .header("apikey", supabaseKey)
                     .retrieve()
                     .toBodilessEntity();
-            log.info("File '{}' deleted successfully.", fileName);
         } catch (Exception e) {
             log.error("Failed to delete file '{}' from Supabase Storage", fileName, e);
         }
