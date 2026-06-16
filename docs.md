@@ -7,4 +7,4 @@
 
 2. GEMINI API key
 
-- API key: AQ.Ab8RN6JNlC4f-gzwiE8oAX0y4oymu80uVla57RqJdvXszrA7Wg
+- API key: AIzaSyCe56kMq-K1fvU44rQB6Km7q4XJlD6xcxo
