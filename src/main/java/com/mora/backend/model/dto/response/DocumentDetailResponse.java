@@ -20,4 +20,6 @@ public class DocumentDetailResponse {
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
     private List<DocumentPageResponse> pages;
+    private String summary;
+    private String flashcards;
 }

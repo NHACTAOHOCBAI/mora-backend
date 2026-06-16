@@ -28,4 +28,12 @@ public interface DocumentService {
      * @param id ID của tài liệu cần xóa
      */
     void deleteDocument(Long id);
+
+    /**
+     * Tạo tóm tắt và câu hỏi ôn tập (Flashcards) tự động cho tài liệu bằng AI.
+     *
+     * @param id ID của tài liệu
+     * @return DTO chi tiết tài liệu chứa tóm tắt và flashcard mới sinh
+     */
+    DocumentDetailResponse generateStudyNotes(Long id);
 }

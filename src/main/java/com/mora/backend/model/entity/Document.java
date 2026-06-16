@@ -48,4 +48,12 @@ public class Document {
     @OneToMany(mappedBy = "document", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
     private List<DocumentPage> pages = new ArrayList<>();
+
+    @Lob
+    @Column(name = "summary", columnDefinition = "TEXT")
+    private String summary;
+
+    @Lob
+    @Column(name = "flashcards", columnDefinition = "TEXT")
+    private String flashcards;
 }

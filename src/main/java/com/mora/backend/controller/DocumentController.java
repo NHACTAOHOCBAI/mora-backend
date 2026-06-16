@@ -47,4 +47,12 @@ public class DocumentController {
         documentService.deleteDocument(id);
         return ResponseEntity.noContent().build();
     }
+
+    @PostMapping("/{id}/generate-study-notes")
+    @Operation(summary = "Tạo tóm tắt tài liệu & câu hỏi ôn tập (Flashcards) tự động bằng AI")
+    public ResponseEntity<DocumentDetailResponse> generateStudyNotes(@PathVariable("id") Long id) {
+        log.info("Received request to generate study notes for document ID: {}", id);
+        DocumentDetailResponse response = documentService.generateStudyNotes(id);
+        return ResponseEntity.ok(response);
+    }
 }
