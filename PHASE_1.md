@@ -55,6 +55,16 @@ Nhằm nâng cao tính học thuật và giá trị thực tiễn của đồ á
    - _Mô tả:_ Giải quyết triệt để hiện tượng phình to dữ liệu (Context Bloating) và nhiễu thông tin khi phiên hội thoại kéo dài, đảm bảo tốc độ phản hồi của AI luôn ở mức cao nhất.
    - _Luồng xử lý:_ Hệ thống áp dụng quy trình xử lý 2 chặng (Two-step LLM Orchestration). Khi nhận câu hỏi mới mang tính chất nối tiếp từ Client, Spring Boot không nhồi toàn bộ lịch sử chat thô vào tài liệu. Thay vào đó, Backend gọi một lượt API nhanh (Lightweight Call) để ép Gemini kết hợp lịch sử gần nhất và câu hỏi mới thành một "Câu hỏi độc lập" (Standalone Question) đã bọc sẵn ngữ cảnh cũ. Sau đó, hệ thống mới dùng câu hỏi sạch này để truy vấn mỏ neo vào kho tài liệu của Space, giúp lõi AI trả về kết quả chính xác, gọn nhẹ và không bị lạc đề.
 
-3. **Ý tưởng Đọc hiểu hình ảnh (Multimodal Vision Engine):**
-   - _Mô tả:_ Hỗ trợ xử lý và phân tích các tài liệu mang tính trực quan như sơ đồ, biểu đồ, ảnh chụp slide bài giảng.
-   - _Luồng xử lý:_ Tận dụng năng lực đa phương thức (Multimodal) của Gemini. Khi phát hiện tệp tin đầu vào là ảnh (`.png`, `.jpg`) hoặc trang tài liệu có chứa thành phần đồ họa (bóc tách qua Apache PDFBox), Spring Boot sẽ chuyển đổi dữ liệu nhị phân của ảnh sang định dạng Base64 và nhúng trực tiếp vào payload request gửi đi cùng với chuỗi ngữ cảnh văn bản. AI sẽ phân tích trực quan cấu trúc hình ảnh để đưa ra câu trả lời mà không cần qua tầng OCR trung gian.
+3. **Đọc hiểu hình ảnh (Multimodal Vision Engine) - ĐÃ TRIỂN KHAI:**
+   - *Mô tả:* Hỗ trợ xử lý và phân tích các tài liệu mang tính trực quan như sơ đồ, biểu đồ, ảnh chụp slide bài giảng bằng cách chuyển đổi và gửi trực tiếp sang định dạng đa phương thức (Multimodal) của Gemini 1.5 Flash.
+   - *Giải pháp phát hiện và tối ưu hình ảnh:*
+     - Sử dụng thư viện **Apache PDFBox** để bóc tách tài liệu. Thay vì chỉ kiểm tra ảnh raster thông thường, hệ thống sử dụng thuật toán kiểm tra sự tồn tại của bất kỳ đối tượng đồ họa ngoài nào (XObjects) qua `page.getResources().getXObjectNames().iterator().hasNext()`. Cách tiếp cận này giúp nhận diện nhạy bén mọi sơ đồ, hình vẽ vector phức tạp (slide bài giảng, hình khối vẽ tay).
+     - Khi phát hiện trang tài liệu chứa đồ họa, backend sẽ dùng `PDFRenderer` kết xuất trang PDF đó sang một ảnh JPEG ảo, sau đó tiến hành thu nhỏ kích thước (max 1024px) và nén chất lượng về 80% (thông qua `ImageUtil.resizeAndCompress`) để tối ưu hóa lượng token tiêu thụ mà vẫn giữ được độ sắc nét.
+   - *Tích hợp LLM qua LangChain4j:*
+     - Khai báo phương thức chat của AI Service nhận danh sách đối tượng `Image` từ LangChain4j, được chú thích rõ ràng bằng `@V("image")` hoặc `@V("images")` để tránh lỗi ánh xạ tham số đa phương thức của Gemini.
+     - Dữ liệu hình ảnh được chuyển đổi sang Base64 JPEG và đóng gói trực tiếp vào payload request gửi đi cùng với chuỗi ngữ cảnh văn bản.
+   - *Tính minh bạch & Giao diện gỡ lỗi (Prompt Debugger):*
+     - Hệ thống tự động ghi nhận chính xác toàn bộ nội dung prompt thực tế đã gửi lên Gemini (bao gồm cả các thẻ ảnh Base64) vào trường `prompt_sent` trong bảng `ChatMessage`.
+     - Ở Frontend, người dùng có thể **double-click (nhấp đúp)** vào bất kỳ bong bóng tin nhắn nào của AI để hiển thị ngay lập tức một popup **Shadcn UI Dialog** chứa thông tin prompt chi tiết, giúp phục vụ việc kiểm thử, gỡ lỗi và đánh giá độ chính xác của ngữ cảnh.
+   - *Xử lý an toàn khi xóa file (Robust Delete):*
+     - Triển khai cơ chế xử lý ngoại lệ thông minh khi xóa tài liệu khỏi Supabase Storage. Nếu file đã bị xóa trước đó trên Storage (lỗi 404/Object not found), hệ thống sẽ ghi log `WARN` thay vì `ERROR` và tiếp tục dọn dẹp sạch sẽ các bản ghi liên quan dưới database PostgreSQL để đảm bảo tính nhất quán của hệ thống.

@@ -56,7 +56,10 @@ com.mora.backend
     *   **Hỏi đáp Source-Grounded (RAG):** Trả lời câu hỏi của người dùng dựa trên ngữ cảnh tài liệu (độc lập hoặc toàn bộ Space).
     *   **Trích dẫn trang (Citations):** Ép đầu ra cấu trúc để Gemini trả về danh sách trích dẫn (quote gốc trong file PDF, số trang, mã tài liệu).
     *   **Rút gọn câu hỏi (Condense Question):** Tự động gom lịch sử trò chuyện trong DB và câu hỏi mới của người dùng thành một câu độc lập trước khi gửi cho LLM.
+    *   **Đọc hiểu hình ảnh (Multimodal Vision Engine):** Tự động phát hiện nhạy bén các trang tài liệu PDF chứa hình vẽ, sơ đồ vector hoặc ảnh (`getXObjectNames().iterator().hasNext()`), tự động kết xuất sang ảnh ảo JPEG tối ưu hóa kích thước và gửi kèm dưới dạng dữ liệu Multimodal (Base64) lên Gemini.
+    *   **Trình gỡ lỗi Prompt (Prompt Debugger):** Lưu vết toàn bộ nội dung prompt chính xác gửi đi vào cơ sở dữ liệu (`prompt_sent`). Hỗ trợ người dùng nhấp đúp (Double-click) vào bong bóng tin nhắn AI trên giao diện React để hiển thị chi tiết prompt gốc trong hộp thoại Shadcn UI Dialog.
     *   **Công cụ học tập thông minh (Study Helper):** Tự động tạo bản Tóm tắt (Summary) học thuật và bộ câu hỏi ôn tập (Flashcards) dưới dạng JSON từ tài liệu.
+    *   **Xử lý lưu trữ bền bỉ (Robust Delete):** Cơ chế xóa file thông minh, tự động bỏ qua lỗi và ghi nhận cảnh báo nếu file không còn trên Supabase Storage nhằm đảm bảo tài liệu và dữ liệu liên quan luôn được dọn dẹp sạch sẽ trong cơ sở dữ liệu PostgreSQL.
 3.  **Lưu trữ Lịch sử Trò chuyện:**
     *   Tự động lưu lại các tin nhắn trao đổi (User & Assistant) vào DB PostgreSQL.
     *   Cung cấp các API REST để lấy lịch sử cuộc trò chuyện và dọn dẹp (xóa) lịch sử trò chuyện của từng tài liệu/Space.
