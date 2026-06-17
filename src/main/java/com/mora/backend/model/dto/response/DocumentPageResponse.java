@@ -13,4 +13,5 @@ public class DocumentPageResponse {
     private Long id;
     private Integer pageNumber;
     private String content;
+    private Boolean hasImage;
 }

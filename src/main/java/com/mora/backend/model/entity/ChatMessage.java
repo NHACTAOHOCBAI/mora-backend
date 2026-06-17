@@ -43,6 +43,10 @@ public class ChatMessage {
     @Column(name = "condensed_question", length = 1024)
     private String condensedQuestion;
 
+    @Lob
+    @Column(name = "prompt_sent", columnDefinition = "TEXT")
+    private String promptSent;
+
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;

@@ -15,6 +15,7 @@ public class DocumentChatResponse {
     private String answer;
     private List<Citation> citations;
     private String condensedQuestion;
+    private String promptSent;
 
     @Data
     @Builder

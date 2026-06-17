@@ -27,4 +27,7 @@ public class DocumentPage {
 
     @Column(name = "content", columnDefinition = "TEXT")
     private String content;
+
+    @Column(name = "has_image")
+    private Boolean hasImage;
 }

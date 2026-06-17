@@ -74,8 +74,16 @@ public class SupabaseStorageServiceImpl implements StorageService {
                     .header("apikey", supabaseKey)
                     .retrieve()
                     .toBodilessEntity();
+            log.info("Successfully deleted file '{}' from Supabase Storage", fileName);
+        } catch (org.springframework.web.client.RestClientResponseException e) {
+            if (e.getResponseBodyAsString().contains("not_found") || e.getResponseBodyAsString().contains("Object not found")) {
+                log.warn("File '{}' was not found on Supabase Storage (already deleted). Response: {}", fileName, e.getResponseBodyAsString());
+            } else {
+                log.error("Failed to delete file '{}' from Supabase Storage. Status: {}, Response: {}", 
+                        fileName, e.getStatusCode(), e.getResponseBodyAsString(), e);
+            }
         } catch (Exception e) {
-            log.error("Failed to delete file '{}' from Supabase Storage", fileName, e);
+            log.error("Failed to delete file '{}' from Supabase Storage due to unexpected error", fileName, e);
         }
     }
 }

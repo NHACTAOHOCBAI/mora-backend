@@ -19,6 +19,7 @@ public class ChatMessageResponse {
     private LocalDateTime timestamp;
     private List<Citation> citations;
     private String condensedQuestion;
+    private String promptSent;
 
     @Data
     @Builder

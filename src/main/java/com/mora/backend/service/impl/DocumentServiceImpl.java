@@ -22,7 +22,12 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.pdfbox.Loader;
 import org.apache.pdfbox.pdmodel.PDDocument;
+import org.apache.pdfbox.pdmodel.PDPage;
+import org.apache.pdfbox.cos.COSName;
+import org.apache.pdfbox.rendering.PDFRenderer;
 import org.apache.pdfbox.text.PDFTextStripper;
+import com.mora.backend.util.ImageUtil;
+import java.awt.image.BufferedImage;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -79,11 +84,16 @@ public class DocumentServiceImpl implements DocumentService {
                     return new AppException(ErrorCode.SPACE_NOT_FOUND);
                 });
 
-        // Validation: Verify if file is PDF
         String contentType = file.getContentType();
         String filename = file.getOriginalFilename();
-        if (!Objects.equals(contentType, "application/pdf") && 
-            (filename == null || !filename.toLowerCase().endsWith(".pdf"))) {
+        boolean isPdf = Objects.equals(contentType, "application/pdf") || 
+                        (filename != null && filename.toLowerCase().endsWith(".pdf"));
+        boolean isImage = (contentType != null && contentType.startsWith("image/")) || 
+                          (filename != null && (filename.toLowerCase().endsWith(".png") || 
+                                                filename.toLowerCase().endsWith(".jpg") || 
+                                                filename.toLowerCase().endsWith(".jpeg")));
+
+        if (!isPdf && !isImage) {
             log.warn("Invalid file format uploaded: {}", filename);
             throw new AppException(ErrorCode.INVALID_FILE_FORMAT);
         }
@@ -97,43 +107,67 @@ public class DocumentServiceImpl implements DocumentService {
             throw new AppException(ErrorCode.FILE_UPLOAD_FAILED);
         }
 
+        String fileType = "pdf";
+        if (isImage) {
+            if (filename != null && filename.contains(".")) {
+                fileType = filename.substring(filename.lastIndexOf(".") + 1).toLowerCase();
+            } else {
+                fileType = "png";
+            }
+        }
+
         // 2. Save Document metadata first
         Document document = Document.builder()
                 .fileName(filename)
-                .fileType("pdf")
+                .fileType(fileType)
                 .storageUrl(storageUrl)
                 .space(space)
                 .build();
         document = documentRepository.save(document);
 
-        // 3. Process PDF pages text extraction
         List<DocumentPage> pages = new ArrayList<>();
-        try (PDDocument pdfDocument = Loader.loadPDF(file.getBytes())) {
-            int pageCount = pdfDocument.getNumberOfPages();
-            
-            PDFTextStripper textStripper = new PDFTextStripper();
-            for (int i = 1; i <= pageCount; i++) {
-                textStripper.setStartPage(i);
-                textStripper.setEndPage(i);
-                String pageContent = textStripper.getText(pdfDocument);
+        if (isPdf) {
+            // 3. Process PDF pages text extraction and image detection
+            try (PDDocument pdfDocument = Loader.loadPDF(file.getBytes())) {
+                int pageCount = pdfDocument.getNumberOfPages();
                 
-                DocumentPage page = DocumentPage.builder()
-                        .document(document)
-                        .pageNumber(i)
-                        .content(pageContent != null ? pageContent.trim() : "")
-                        .build();
-                pages.add(page);
+                PDFTextStripper textStripper = new PDFTextStripper();
+                for (int i = 1; i <= pageCount; i++) {
+                    textStripper.setStartPage(i);
+                    textStripper.setEndPage(i);
+                    String pageContent = textStripper.getText(pdfDocument);
+                    
+                    PDPage pdfPage = pdfDocument.getPage(i - 1);
+                    boolean hasImg = hasImages(pdfPage);
+
+                    DocumentPage page = DocumentPage.builder()
+                            .document(document)
+                            .pageNumber(i)
+                            .content(pageContent != null ? pageContent.trim() : "")
+                            .hasImage(hasImg)
+                            .build();
+                    pages.add(page);
+                }
+            } catch (IOException e) {
+                log.error("Error occurred while reading and parsing PDF: {}", filename, e);
+                // Clean up uploaded storage file on error
+                try {
+                    String key = storageUrl.substring(storageUrl.lastIndexOf("/") + 1);
+                    storageService.delete(key);
+                } catch (Exception ex) {
+                    log.error("Failed to clean up uploaded file from storage after parser failure", ex);
+                }
+                throw new RuntimeException("Lỗi bóc tách nội dung PDF: " + e.getMessage(), e);
             }
-        } catch (IOException e) {
-            log.error("Error occurred while reading and parsing PDF: {}", filename, e);
-            // Clean up uploaded storage file on error
-            try {
-                String key = storageUrl.substring(storageUrl.lastIndexOf("/") + 1);
-                storageService.delete(key);
-            } catch (Exception ex) {
-                log.error("Failed to clean up uploaded file from storage after parser failure", ex);
-            }
-            throw new RuntimeException("Lỗi bóc tách nội dung PDF: " + e.getMessage(), e);
+        } else {
+            // For images, we create a single page that is flagged as having an image
+            DocumentPage page = DocumentPage.builder()
+                    .document(document)
+                    .pageNumber(1)
+                    .content("")
+                    .hasImage(true)
+                    .build();
+            pages.add(page);
         }
 
         // 4. Save all extracted pages
@@ -142,6 +176,18 @@ public class DocumentServiceImpl implements DocumentService {
 
         // 5. Convert and return Response DTO
         return convertToDocumentResponse(document);
+    }
+
+    private boolean hasImages(PDPage page) {
+        try {
+            if (page.getResources() == null) {
+                return false;
+            }
+            return page.getResources().getXObjectNames().iterator().hasNext();
+        } catch (Exception e) {
+            log.warn("Lỗi kiểm tra hình ảnh trên trang PDF", e);
+        }
+        return false;
     }
 
     @Override
@@ -160,6 +206,7 @@ public class DocumentServiceImpl implements DocumentService {
                         .id(page.getId())
                         .pageNumber(page.getPageNumber())
                         .content(page.getContent())
+                        .hasImage(page.getHasImage())
                         .build())
                 .toList();
 
@@ -293,5 +340,49 @@ public class DocumentServiceImpl implements DocumentService {
                 .createdAt(document.getCreatedAt())
                 .updatedAt(document.getUpdatedAt())
                 .build();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public byte[] renderPageImage(Long documentId, int pageNumber) {
+        Document document = documentRepository.findById(documentId)
+                .orElseThrow(() -> {
+                    log.warn("Document with ID {} not found for rendering", documentId);
+                    return new AppException(ErrorCode.DOCUMENT_NOT_FOUND);
+                });
+
+        boolean isPdf = "pdf".equalsIgnoreCase(document.getFileType());
+
+        if (!isPdf) {
+            // If the document is an image, download and optimize it directly
+            try {
+                byte[] rawImage = downloadFile(document.getStorageUrl());
+                return ImageUtil.resizeAndCompress(rawImage);
+            } catch (IOException e) {
+                log.error("Failed to download image file from storage: {}", document.getStorageUrl(), e);
+                throw new RuntimeException("Không thể tải hình ảnh từ Storage: " + e.getMessage());
+            }
+        }
+
+        try {
+            byte[] pdfBytes = downloadFile(document.getStorageUrl());
+            try (PDDocument pdfDocument = Loader.loadPDF(pdfBytes)) {
+                if (pageNumber < 1 || pageNumber > pdfDocument.getNumberOfPages()) {
+                    throw new IllegalArgumentException("Số trang không hợp lệ: " + pageNumber);
+                }
+                PDFRenderer pdfRenderer = new PDFRenderer(pdfDocument);
+                BufferedImage bim = pdfRenderer.renderImageWithDPI(pageNumber - 1, 150);
+                return ImageUtil.resizeAndCompress(bim);
+            }
+        } catch (IOException e) {
+            log.error("Failed to render PDF page to image for document ID: {}, page: {}", documentId, pageNumber, e);
+            throw new RuntimeException("Lỗi kết xuất trang PDF sang hình ảnh: " + e.getMessage(), e);
+        }
+    }
+
+    private byte[] downloadFile(String urlString) throws IOException {
+        try (java.io.InputStream in = java.net.URI.create(urlString).toURL().openStream()) {
+            return in.readAllBytes();
+        }
     }
 }

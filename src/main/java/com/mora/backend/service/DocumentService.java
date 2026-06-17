@@ -45,4 +45,13 @@ public interface DocumentService {
      * @return DTO chứa thông tin tài liệu đã cập nhật
      */
     DocumentResponse renameDocument(Long id, String newName);
+
+    /**
+     * Kết xuất trang PDF hoặc ảnh gốc và trả về byte array hình ảnh đã được tối ưu hóa.
+     *
+     * @param documentId ID của tài liệu
+     * @param pageNumber Số trang
+     * @return Byte array của ảnh (JPEG) đã tối ưu
+     */
+    byte[] renderPageImage(Long documentId, int pageNumber);
 }

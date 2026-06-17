@@ -17,6 +17,9 @@ import com.mora.backend.repository.DocumentRepository;
 import com.mora.backend.repository.SpaceRepository;
 import com.mora.backend.repository.ChatMessageRepository;
 import com.mora.backend.service.ChatService;
+import com.mora.backend.service.DocumentService;
+import java.util.Base64;
+import java.util.ArrayList;
 import dev.langchain4j.model.chat.ChatLanguageModel;
 import dev.langchain4j.service.AiServices;
 import dev.langchain4j.service.SystemMessage;
@@ -41,6 +44,7 @@ public class ChatServiceImpl implements ChatService {
     private final SpaceRepository spaceRepository;
     private final ChatMessageRepository chatMessageRepository;
     private final ChatLanguageModel chatLanguageModel;
+    private final DocumentService documentService;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     // Interface dùng cho LangChain4j AiServices để tự động hóa Prompt và Structured Outputs
@@ -48,6 +52,7 @@ public class ChatServiceImpl implements ChatService {
         @SystemMessage("""
             Bạn là một trợ lý học thuật nghiêm khắc.
             Hãy trả lời câu hỏi của người dùng CHỈ sử dụng thông tin từ ngữ cảnh tài liệu được cung cấp dưới đây.
+            Nếu ngữ cảnh chứa hình ảnh, hãy phân tích kỹ hình ảnh đó để hỗ trợ trả lời.
             Nếu thông tin trong tài liệu không đủ hoặc câu hỏi nằm ngoài phạm vi tài liệu, bạn bắt buộc phải trả lời 'false' cho trường 'answerFound', không được tự ý đoán mò, và đặt 'answer' thành câu từ chối trả lời phù hợp (Ví dụ: "Tôi không tìm thấy thông tin này trong tài liệu.").
             """)
         @UserMessage("""
@@ -57,6 +62,20 @@ public class ChatServiceImpl implements ChatService {
             Câu hỏi: {{question}}
             """)
         DocumentChatResponse chat(@V("context") String context, @V("question") String question);
+
+        @SystemMessage("""
+            Bạn là một trợ lý học thuật nghiêm khắc.
+            Hãy trả lời câu hỏi của người dùng CHỈ sử dụng thông tin từ ngữ cảnh tài liệu được cung cấp dưới đây.
+            Nếu ngữ cảnh chứa hình ảnh, hãy phân tích kỹ hình ảnh đó để hỗ trợ trả lời.
+            Nếu thông tin trong tài liệu không đủ hoặc câu hỏi nằm ngoài phạm vi tài liệu, bạn bắt buộc phải trả lời 'false' cho trường 'answerFound', không được tự ý đoán mò, và đặt 'answer' thành câu từ chối trả lời phù hợp (Ví dụ: "Tôi không tìm thấy thông tin này trong tài liệu.").
+            """)
+        @UserMessage("""
+            Ngữ cảnh tài liệu:
+            {{context}}
+            
+            Câu hỏi: {{question}}
+            """)
+        DocumentChatResponse chatWithImage(@V("context") String context, @V("question") String question, @V("image") dev.langchain4j.data.image.Image image);
     }
 
     interface SpaceAssistant {
@@ -64,6 +83,7 @@ public class ChatServiceImpl implements ChatService {
             Bạn là một trợ lý học thuật nghiêm khắc.
             Hãy trả lời câu hỏi của người dùng CHỈ sử dụng thông tin từ ngữ cảnh tài liệu được cung cấp dưới đây.
             Ngữ cảnh chứa nhiều tài liệu khác nhau. Mỗi tài liệu được phân tách bằng '--- BẮT ĐẦU FILE: ID [id_cua_file], TÊN [tên file] ---' và '--- KẾT THÚC FILE...'.
+            Nếu ngữ cảnh chứa hình ảnh, hãy phân tích kỹ hình ảnh đó để hỗ trợ trả lời.
             Nếu thông tin trong các tài liệu không đủ hoặc câu hỏi nằm ngoài phạm vi tài liệu, bạn bắt buộc phải trả lời 'false' cho trường 'answerFound', không được tự ý đoán mò, và đặt 'answer' thành câu từ chối trả lời phù hợp (Ví dụ: "Tôi không tìm thấy thông tin này trong các tài liệu của không gian học tập.").
             Trong mảng trích dẫn (citations), với mỗi trích dẫn bạn phải cung cấp chính xác 'documentId' (lấy từ ID [id_cua_file] trong tiêu đề file tương ứng) và 'pageNumber' của trang chứa câu trích dẫn đó.
             """)
@@ -74,6 +94,22 @@ public class ChatServiceImpl implements ChatService {
             Câu hỏi: {{question}}
             """)
         SpaceChatResponse chat(@V("context") String context, @V("question") String question);
+
+        @SystemMessage("""
+            Bạn là một trợ lý học thuật nghiêm khắc.
+            Hãy trả lời câu hỏi của người dùng CHỈ sử dụng thông tin từ ngữ cảnh tài liệu được cung cấp dưới đây.
+            Ngữ cảnh chứa nhiều tài liệu khác nhau. Mỗi tài liệu được phân tách bằng '--- BẮT ĐẦU FILE: ID [id_cua_file], TÊN [tên file] ---' và '--- KẾT THÚC FILE...'.
+            Nếu ngữ cảnh chứa hình ảnh, hãy phân tích kỹ hình ảnh đó để hỗ trợ trả lời.
+            Nếu thông tin trong các tài liệu không đủ hoặc câu hỏi nằm ngoài phạm vi tài liệu, bạn bắt buộc phải trả lời 'false' cho trường 'answerFound', không được tự ý đoán mò, và đặt 'answer' thành câu từ chối trả lời phù hợp (Ví dụ: "Tôi không tìm thấy thông tin này trong các tài liệu của không gian học tập.").
+            Trong mảng trích dẫn (citations), với mỗi trích dẫn bạn phải cung cấp chính xác 'documentId' (lấy từ ID [id_cua_file] trong tiêu đề file tương ứng) và 'pageNumber' của trang chứa câu trích dẫn đó.
+            """)
+        @UserMessage("""
+            Ngữ cảnh tài liệu:
+            {{context}}
+            
+            Câu hỏi: {{question}}
+            """)
+        SpaceChatResponse chatWithImages(@V("context") String context, @V("question") String question, @V("images") List<dev.langchain4j.data.image.Image> images);
     }
 
     // Interface dùng để rút gọn câu hỏi nối tiếp dựa trên lịch sử
@@ -173,15 +209,89 @@ public class ChatServiceImpl implements ChatService {
 
         String condensedQuestion = getCondensedQuestion(historyDtoList, request.getQuestion());
 
-        // 5. Tạo AI Assistant thông qua LangChain4j AiServices
+        // 5. Kiểm tra và chuẩn bị ảnh để gửi kèm nếu có trang chứa hình ảnh
+        dev.langchain4j.data.image.Image imageToSend = null;
+        boolean isPdf = "pdf".equalsIgnoreCase(document.getFileType());
+
+        if (!isPdf) {
+            try {
+                byte[] imageBytes = documentService.renderPageImage(document.getId(), 1);
+                if (imageBytes != null && imageBytes.length > 0) {
+                    imageToSend = dev.langchain4j.data.image.Image.builder()
+                            .base64Data(Base64.getEncoder().encodeToString(imageBytes))
+                            .mimeType("image/jpeg")
+                            .build();
+                }
+            } catch (Exception e) {
+                log.warn("Lỗi khi kết xuất ảnh cho tài liệu hình ảnh", e);
+            }
+        } else {
+            int targetPage = extractPageNumber(request.getQuestion());
+            DocumentPage pageWithImage = null;
+            
+            if (targetPage > 0) {
+                for (DocumentPage page : pages) {
+                    if (page.getPageNumber() == targetPage && Boolean.TRUE.equals(page.getHasImage())) {
+                        pageWithImage = page;
+                        break;
+                    }
+                }
+            }
+            
+            if (pageWithImage == null) {
+                for (DocumentPage page : pages) {
+                    if (Boolean.TRUE.equals(page.getHasImage())) {
+                        pageWithImage = page;
+                        break;
+                    }
+                }
+            }
+            
+            if (pageWithImage != null) {
+                try {
+                    byte[] imageBytes = documentService.renderPageImage(document.getId(), pageWithImage.getPageNumber());
+                    if (imageBytes != null && imageBytes.length > 0) {
+                        imageToSend = dev.langchain4j.data.image.Image.builder()
+                                .base64Data(Base64.getEncoder().encodeToString(imageBytes))
+                                .mimeType("image/jpeg")
+                                .build();
+                        log.info("Đã tự động gửi kèm ảnh của trang {} để trợ giúp hỏi đáp", pageWithImage.getPageNumber());
+                    }
+                } catch (Exception e) {
+                    log.warn("Lỗi khi render trang {} làm ảnh", pageWithImage.getPageNumber(), e);
+                }
+            }
+        }
+
+        // 6. Tạo AI Assistant thông qua LangChain4j AiServices
         GeminiAssistant assistant = AiServices.builder(GeminiAssistant.class)
                 .chatLanguageModel(chatLanguageModel)
                 .build();
 
-        // 6. Gọi Gemini và nhận kết quả cấu trúc
+        String fullPrompt = String.format("""
+                [SYSTEM PROMPT]
+                Bạn là một trợ lý học thuật nghiêm khắc.
+                Hãy trả lời câu hỏi của người dùng CHỈ sử dụng thông tin từ ngữ cảnh tài liệu được cung cấp dưới đây.
+                Nếu ngữ cảnh chứa hình ảnh, hãy phân tích kỹ hình ảnh đó để hỗ trợ trả lời.
+                Nếu thông tin trong tài liệu không đủ hoặc câu hỏi nằm ngoài phạm vi tài liệu, bạn bắt buộc phải trả lời 'false' cho trường 'answerFound', không được tự ý đoán mò, và đặt 'answer' thành câu từ chối trả lời phù hợp (Ví dụ: "Tôi không tìm thấy thông tin này trong tài liệu.").
+                
+                [USER MESSAGE]
+                Ngữ cảnh tài liệu:
+                %s
+                
+                Câu hỏi: %s""", context, condensedQuestion);
+
+        // 7. Gọi Gemini và nhận kết quả cấu trúc
         try {
-            DocumentChatResponse response = assistant.chat(context, condensedQuestion);
+            DocumentChatResponse response;
+            if (imageToSend != null) {
+                response = assistant.chatWithImage(context, condensedQuestion, imageToSend);
+            } else {
+                response = assistant.chat(context, condensedQuestion);
+            }
+            
             response.setCondensedQuestion(condensedQuestion);
+            response.setPromptSent(fullPrompt);
             if (response.getCitations() != null) {
                 for (DocumentChatResponse.Citation citation : response.getCitations()) {
                     citation.setDocumentId(document.getId());
@@ -206,6 +316,7 @@ public class ChatServiceImpl implements ChatService {
                     .space(document.getSpace())
                     .citations(citationsJson)
                     .condensedQuestion(condensedQuestion)
+                    .promptSent(fullPrompt)
                     .build();
             chatMessageRepository.save(assistantMessage);
 
@@ -214,6 +325,20 @@ public class ChatServiceImpl implements ChatService {
             log.error("Error occurred while calling Gemini API via LangChain4j", e);
             throw new RuntimeException("Lỗi kết nối hoặc xử lý từ AI Engine: " + e.getMessage(), e);
         }
+    }
+
+    private int extractPageNumber(String question) {
+        if (question == null) return -1;
+        String lower = question.toLowerCase();
+        java.util.regex.Matcher matcher = java.util.regex.Pattern.compile("(?:trang|page)\\s*(\\d+)").matcher(lower);
+        if (matcher.find()) {
+            try {
+                return Integer.parseInt(matcher.group(1));
+            } catch (NumberFormatException e) {
+                // ignore
+            }
+        }
+        return -1;
     }
 
     @Override
@@ -279,15 +404,61 @@ public class ChatServiceImpl implements ChatService {
 
         String condensedQuestion = getCondensedQuestion(historyDtoList, request.getQuestion());
 
-        // 5. Tạo AI Assistant thông qua LangChain4j AiServices
+        // 5. Kiểm tra và chuẩn bị ảnh từ các trang chứa hình ảnh (tối đa 3 ảnh)
+        List<dev.langchain4j.data.image.Image> imagesToSend = new ArrayList<>();
+        int imageCount = 0;
+        for (DocumentPage page : pages) {
+            if (Boolean.TRUE.equals(page.getHasImage())) {
+                try {
+                    byte[] imageBytes = documentService.renderPageImage(page.getDocument().getId(), page.getPageNumber());
+                    if (imageBytes != null && imageBytes.length > 0) {
+                        dev.langchain4j.data.image.Image imgObj = dev.langchain4j.data.image.Image.builder()
+                                .base64Data(Base64.getEncoder().encodeToString(imageBytes))
+                                .mimeType("image/jpeg")
+                                .build();
+                        imagesToSend.add(imgObj);
+                        imageCount++;
+                        if (imageCount >= 3) {
+                            break;
+                        }
+                    }
+                } catch (Exception e) {
+                    log.warn("Lỗi render ảnh trong Space Chat cho doc {}, page {}", page.getDocument().getId(), page.getPageNumber(), e);
+                }
+            }
+        }
+
+        // 6. Tạo AI Assistant thông qua LangChain4j AiServices
         SpaceAssistant assistant = AiServices.builder(SpaceAssistant.class)
                 .chatLanguageModel(chatLanguageModel)
                 .build();
 
-        // 6. Gọi Gemini và nhận kết quả cấu trúc
+        String fullPrompt = String.format("""
+                [SYSTEM PROMPT]
+                Bạn là một trợ lý học thuật nghiêm khắc.
+                Hãy trả lời câu hỏi của người dùng CHỈ sử dụng thông tin từ ngữ cảnh tài liệu được cung cấp dưới đây.
+                Ngữ cảnh chứa nhiều tài liệu khác nhau. Mỗi tài liệu được phân tách bằng '--- BẮT ĐẦU FILE: ID [id_cua_file], TÊN [tên file] ---' và '--- KẾT THÚC FILE...'.
+                Nếu ngữ cảnh chứa hình ảnh, hãy phân tích kỹ hình ảnh đó để hỗ trợ trả lời.
+                Nếu thông tin trong các tài liệu không đủ hoặc câu hỏi nằm ngoài phạm vi tài liệu, bạn bắt buộc phải trả lời 'false' cho trường 'answerFound', không được tự ý đoán mò, và đặt 'answer' thành câu từ chối trả lời phù hợp (Ví dụ: "Tôi không tìm thấy thông tin này trong các tài liệu của không gian học tập.").
+                Trong mảng trích dẫn (citations), với mỗi trích dẫn bạn phải cung cấp chính xác 'documentId' (lấy từ ID [id_cua_file] trong tiêu đề file tương ứng) và 'pageNumber' của trang chứa câu trích dẫn đó.
+                
+                [USER MESSAGE]
+                Ngữ cảnh tài liệu:
+                %s
+                
+                Câu hỏi: %s""", context, condensedQuestion);
+
+        // 7. Gọi Gemini và nhận kết quả cấu trúc
         try {
-            SpaceChatResponse response = assistant.chat(context, condensedQuestion);
+            SpaceChatResponse response;
+            if (!imagesToSend.isEmpty()) {
+                response = assistant.chatWithImages(context, condensedQuestion, imagesToSend);
+            } else {
+                response = assistant.chat(context, condensedQuestion);
+            }
+            
             response.setCondensedQuestion(condensedQuestion);
+            response.setPromptSent(fullPrompt);
             if (response.getCitations() != null) {
                 for (SpaceChatResponse.SpaceCitation citation : response.getCitations()) {
                     if (citation.getDocumentId() != null) {
@@ -314,6 +485,7 @@ public class ChatServiceImpl implements ChatService {
                     .space(space)
                     .citations(citationsJson)
                     .condensedQuestion(condensedQuestion)
+                    .promptSent(fullPrompt)
                     .build();
             chatMessageRepository.save(assistantMessage);
 
@@ -377,6 +549,7 @@ public class ChatServiceImpl implements ChatService {
                 .timestamp(msg.getCreatedAt())
                 .citations(citations)
                 .condensedQuestion(msg.getCondensedQuestion())
+                .promptSent(msg.getPromptSent())
                 .build();
     }
 }

@@ -15,6 +15,7 @@ public class SpaceChatResponse {
     private String answer;
     private List<SpaceCitation> citations;
     private String condensedQuestion;
+    private String promptSent;
 
     @Data
     @Builder
