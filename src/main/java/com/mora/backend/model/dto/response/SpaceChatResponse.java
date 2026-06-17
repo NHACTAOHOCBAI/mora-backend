@@ -23,6 +23,7 @@ public class SpaceChatResponse {
     public static class SpaceCitation {
         private String quote;
         private Long documentId;
+        private String documentName;
         private Integer pageNumber;
     }
 }

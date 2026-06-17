@@ -36,4 +36,13 @@ public interface DocumentService {
      * @return DTO chi tiết tài liệu chứa tóm tắt và flashcard mới sinh
      */
     DocumentDetailResponse generateStudyNotes(Long id);
+
+    /**
+     * Đổi tên tài liệu.
+     *
+     * @param id ID của tài liệu
+     * @param newName Tên mới của tài liệu
+     * @return DTO chứa thông tin tài liệu đã cập nhật
+     */
+    DocumentResponse renameDocument(Long id, String newName);
 }

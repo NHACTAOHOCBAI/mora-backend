@@ -182,6 +182,12 @@ public class ChatServiceImpl implements ChatService {
         try {
             DocumentChatResponse response = assistant.chat(context, condensedQuestion);
             response.setCondensedQuestion(condensedQuestion);
+            if (response.getCitations() != null) {
+                for (DocumentChatResponse.Citation citation : response.getCitations()) {
+                    citation.setDocumentId(document.getId());
+                    citation.setDocumentName(document.getFileName());
+                }
+            }
 
             // Lưu phản hồi của AI vào DB
             String citationsJson = null;
@@ -282,6 +288,14 @@ public class ChatServiceImpl implements ChatService {
         try {
             SpaceChatResponse response = assistant.chat(context, condensedQuestion);
             response.setCondensedQuestion(condensedQuestion);
+            if (response.getCitations() != null) {
+                for (SpaceChatResponse.SpaceCitation citation : response.getCitations()) {
+                    if (citation.getDocumentId() != null) {
+                        documentRepository.findById(citation.getDocumentId())
+                            .ifPresent(doc -> citation.setDocumentName(doc.getFileName()));
+                    }
+                }
+            }
 
             // Lưu phản hồi của AI vào DB
             String citationsJson = null;
@@ -341,6 +355,17 @@ public class ChatServiceImpl implements ChatService {
         if (msg.getCitations() != null && !msg.getCitations().isEmpty()) {
             try {
                 citations = objectMapper.readValue(msg.getCitations(), new TypeReference<List<ChatMessageResponse.Citation>>() {});
+                if (citations != null) {
+                    for (ChatMessageResponse.Citation citation : citations) {
+                        if (citation.getDocumentId() != null) {
+                            documentRepository.findById(citation.getDocumentId())
+                                .ifPresent(doc -> citation.setDocumentName(doc.getFileName()));
+                        } else if (msg.getDocument() != null) {
+                            citation.setDocumentName(msg.getDocument().getFileName());
+                            citation.setDocumentId(msg.getDocument().getId());
+                        }
+                    }
+                }
             } catch (Exception e) {
                 log.error("Failed to deserialize citations from JSON", e);
             }

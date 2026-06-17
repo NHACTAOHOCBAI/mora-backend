@@ -1,10 +1,12 @@
 package com.mora.backend.controller;
 
+import com.mora.backend.model.dto.request.DocumentRenameRequest;
 import com.mora.backend.model.dto.response.DocumentDetailResponse;
 import com.mora.backend.model.dto.response.DocumentResponse;
 import com.mora.backend.service.DocumentService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -47,6 +49,15 @@ public class DocumentController {
     @Operation(summary = "Tạo tóm tắt tài liệu & câu hỏi ôn tập (Flashcards) tự động bằng AI")
     public ResponseEntity<DocumentDetailResponse> generateStudyNotes(@PathVariable("id") Long id) {
         DocumentDetailResponse response = documentService.generateStudyNotes(id);
+        return ResponseEntity.ok(response);
+    }
+
+    @PatchMapping("/{id}/rename")
+    @Operation(summary = "Đổi tên tài liệu")
+    public ResponseEntity<DocumentResponse> renameDocument(
+            @PathVariable("id") Long id,
+            @Valid @RequestBody DocumentRenameRequest request) {
+        DocumentResponse response = documentService.renameDocument(id, request.getFileName());
         return ResponseEntity.ok(response);
     }
 }

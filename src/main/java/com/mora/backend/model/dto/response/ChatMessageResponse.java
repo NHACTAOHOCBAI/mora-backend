@@ -27,6 +27,7 @@ public class ChatMessageResponse {
     public static class Citation {
         private String quote;
         private Long documentId;
+        private String documentName;
         private Integer pageNumber;
     }
 }

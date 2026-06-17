@@ -266,6 +266,24 @@ public class DocumentServiceImpl implements DocumentService {
         return getDocumentById(id);
     }
 
+    @Override
+    @Transactional
+    public DocumentResponse renameDocument(Long id, String newName) {
+        Document document = documentRepository.findById(id)
+                .orElseThrow(() -> {
+                    log.warn("Document with ID {} not found for renaming", id);
+                    return new AppException(ErrorCode.DOCUMENT_NOT_FOUND);
+                });
+
+        if (newName != null && !newName.toLowerCase().endsWith(".pdf")) {
+            newName = newName + ".pdf";
+        }
+
+        document.setFileName(newName);
+        document = documentRepository.save(document);
+        return convertToDocumentResponse(document);
+    }
+
     private DocumentResponse convertToDocumentResponse(Document document) {
         return DocumentResponse.builder()
                 .id(document.getId())
