@@ -7,7 +7,7 @@ Giai đoạn này tập trung hoàn toàn vào việc hiện thực hóa mô hì
 - **Tư duy thiết kế Cơ sở dữ liệu:** Để hỗ trợ việc trích dẫn chính xác theo trang, dữ liệu văn bản không được lưu trữ thành một khối thô dài (raw text block) mà bắt buộc phải thực thể hóa và gắn chặt với chỉ số trang (`page_number`).
   - _Bảng lưu thông tin tổng quan (Documents):_ Lưu trữ định danh tài liệu, tên file gốc, định dạng (PDF/Docx) và đường dẫn liên kết đến phân vùng lưu trữ file vật lý (Object Storage).
   - _Bảng lưu cấu trúc trang (Document Pages):_ Có mối quan hệ Một-Nhiều với bảng tổng quan. Mỗi dòng trong bảng này chỉ đại diện cho duy nhất nội dung chữ của một trang cụ thể, đi kèm số trang tương ứng.
-- **Ý tưởng xử lý trích xuất văn bản trong Spring Boot:** \* Khi người dùng upload file lên hệ thống, Backend tiếp nhận file dưới dạng luồng dữ liệu (Stream).
+- **Ý tưởng xử lý trích xuất văn bản trong Spring Boot:** * Khi người dùng upload file lên hệ thống, Backend tiếp nhận file dưới dạng luồng dữ liệu (Stream).
   - Sử dụng thư viện bóc tách văn bản (như Apache PDFBox) để đọc siêu dữ liệu (metadata) nhằm xác định tổng số trang của file.
   - Chạy một vòng lặp quét qua từng trang độc lập, trích xuất toàn bộ ký tự hiển thị trên trang đó thành một chuỗi văn bản sạch.
   - Lưu từng trang này thành các bản ghi riêng biệt vào Cơ sở dữ liệu. File gốc đồng thời được đẩy lên kho lưu trữ (như Supabase Storage) để chuẩn bị cho việc hiển thị trực quan ở Frontend.
@@ -52,19 +52,42 @@ Nhằm nâng cao tính học thuật và giá trị thực tiễn của đồ á
    - _Luồng xử lý:_ Frontend chỉ cần truyền lên mã định danh `space_id` và câu hỏi. Ở Backend, Spring Boot thực hiện truy vấn nối bảng (Join Query) để quét sạch toàn bộ dữ liệu các trang (`document_pages`) thuộc tất cả tài liệu nằm trong Space chỉ định. Toàn bộ kho text này được đóng gói tập trung vào một siêu cấu trúc ngữ cảnh có phân ranh giới file/trang rõ ràng trước khi gửi lên Gemini API. AI trả về JSON chứa nội dung kèm cặp định vị nguồn `{document_id, page_number}` để Frontend hiển thị và chuyển đổi file trực quan khi người dùng tương tác trích dẫn.
 
 2. **Ý tưởng Tối ưu hội thoại dài (Condense Question Engine):**
-   - _Mô tả:_ Giải quyết triệt để hiện tượng phình to dữ liệu (Context Bloating) và nhiễu thông tin khi phiên hội thoại kéo dài, đảm bảo tốc độ phản hồi của AI luôn ở mức cao nhất.
+   - _Mô tả:_ Xử lý triệt để hiện tượng phình to dữ liệu (Context Bloating) và nhiễu thông tin khi phiên hội thoại kéo dài, đảm bảo tốc độ phản hồi của AI luôn ở mức cao nhất.
    - _Luồng xử lý:_ Hệ thống áp dụng quy trình xử lý 2 chặng (Two-step LLM Orchestration). Khi nhận câu hỏi mới mang tính chất nối tiếp từ Client, Spring Boot không nhồi toàn bộ lịch sử chat thô vào tài liệu. Thay vào đó, Backend gọi một lượt API nhanh (Lightweight Call) để ép Gemini kết hợp lịch sử gần nhất và câu hỏi mới thành một "Câu hỏi độc lập" (Standalone Question) đã bọc sẵn ngữ cảnh cũ. Sau đó, hệ thống mới dùng câu hỏi sạch này để truy vấn mỏ neo vào kho tài liệu của Space, giúp lõi AI trả về kết quả chính xác, gọn nhẹ và không bị lạc đề.
 
 3. **Đọc hiểu hình ảnh (Multimodal Vision Engine) - ĐÃ TRIỂN KHAI:**
    - *Mô tả:* Hỗ trợ xử lý và phân tích các tài liệu mang tính trực quan như sơ đồ, biểu đồ, ảnh chụp slide bài giảng bằng cách chuyển đổi và gửi trực tiếp sang định dạng đa phương thức (Multimodal) của Gemini 1.5 Flash.
-   - *Giải pháp phát hiện và tối ưu hình ảnh:*
-     - Sử dụng thư viện **Apache PDFBox** để bóc tách tài liệu. Thay vì chỉ kiểm tra ảnh raster thông thường, hệ thống sử dụng thuật toán kiểm tra sự tồn tại của bất kỳ đối tượng đồ họa ngoài nào (XObjects) qua `page.getResources().getXObjectNames().iterator().hasNext()`. Cách tiếp cận này giúp nhận diện nhạy bén mọi sơ đồ, hình vẽ vector phức tạp (slide bài giảng, hình khối vẽ tay).
-     - Khi phát hiện trang tài liệu chứa đồ họa, backend sẽ dùng `PDFRenderer` kết xuất trang PDF đó sang một ảnh JPEG ảo, sau đó tiến hành thu nhỏ kích thước (max 1024px) và nén chất lượng về 80% (thông qua `ImageUtil.resizeAndCompress`) để tối ưu hóa lượng token tiêu thụ mà vẫn giữ được độ sắc nét.
+   - *Quy trình lọc hình ảnh 2 tầng thông minh (Two-Tier Image Filtering):*
+     Nhằm mục đích phát hiện chính xác các trang thực sự chứa nội dung học thuật trực quan (biểu đồ, sơ đồ) và loại bỏ những hình ảnh trang trí, icon lặp lại (tránh tốn tài nguyên token và làm nhiễu AI), hệ thống áp dụng cơ chế lọc như sau:
+     * **Tầng 1 (Tier 1 - Kích thước & Tỷ lệ):**
+       - Lấy danh sách các đối tượng hình ảnh (PDImageXObject) thuộc XObjects từ tài nguyên của từng trang PDF thông qua thư viện Apache PDFBox.
+       - Loại bỏ ngay lập tức những ảnh nhỏ có chiều rộng hoặc chiều cao <= 200px.
+       - Loại bỏ các ảnh có tỷ lệ khung hình dị dạng: Aspect Ratio = Width/Height < 0.33 hoặc > 3.0.
+     * **Tầng 2 (Tier 2 - So khớp Perceptual Hash & Hamming Distance):**
+       - Với các ảnh vượt qua Tầng 1, hệ thống sử dụng thuật toán Perceptual Hash (pHash) để tính toán mã nhận diện nội dung trực quan:
+         1. Thu nhỏ hình ảnh về kích thước cố định 8x8 pixel bằng thuật toán tỷ lệ nhanh (Image.SCALE_FAST).
+         2. Chuyển đổi ảnh sang dạng xám (Grayscale - TYPE_BYTE_GRAY).
+         3. Tính giá trị độ sáng trung bình của 64 điểm ảnh.
+         4. So sánh độ sáng của từng điểm với giá trị trung bình để chuyển đổi thành một số nguyên 64-bit (long), trong đó mỗi bit đại diện cho trạng thái lớn hơn hoặc nhỏ hơn trung bình.
+       - Tính toán độ tương đồng giữa các ảnh bằng Hamming Distance (phép toán XOR và đếm số bit khác biệt: Long.bitCount(hash1 ^ hash2)). Nếu khoảng cách Hamming giữa hai ảnh <= 10 và chúng có cùng kích thước hình học, chúng được xem là trùng lặp về mặt thị giác.
+       - Đếm tần suất xuất hiện của từng ảnh trong toàn bộ tài liệu: Nếu một ảnh xuất hiện từ 2 lần trở lên (như logo header, footer, background watermark), hệ thống coi đó là ảnh trang trí và lọc bỏ. Chỉ có các ảnh độc bản (xuất hiện đúng 1 lần trong tài liệu) mới được chấp nhận.
+       - Ghi nhận trạng thái: Nếu trang PDF chứa ít nhất một ảnh độc bản và hợp lệ, thuộc tính hasImage của bản ghi document_pages được đánh dấu là true.
+   - *Quy trình kết xuất hình ảnh phục vụ LLM (Render & Compress):*
+     - Khi cần đọc hiểu nội dung trang PDF chứa ảnh, hệ thống gọi dịch vụ tải PDF từ bộ nhớ đệm (Local Cache) để tránh tải lại nhiều lần từ Supabase.
+     - Sử dụng PDFRenderer.renderImageWithDPI(pageIndex, 150) để chuyển trang PDF thành một đối tượng BufferedImage với độ phân giải 150 DPI.
+     - Nén và tối ưu hóa ảnh thông qua ImageUtil.resizeAndCompress (giới hạn kích thước tối đa 1024px và chất lượng nén JPG 80%) để thu được luồng dữ liệu byte ảnh tối ưu hóa nhất trước khi chuyển sang Base64 gửi lên Gemini.
    - *Tích hợp LLM qua LangChain4j:*
-     - Khai báo phương thức chat của AI Service nhận danh sách đối tượng `Image` từ LangChain4j, được chú thích rõ ràng bằng `@V("image")` hoặc `@V("images")` để tránh lỗi ánh xạ tham số đa phương thức của Gemini.
+     - Khai báo phương thức chat của AI Service nhận danh sách đối tượng Image từ LangChain4j, được chú thích rõ ràng bằng @V("image") hoặc @V("images") để tránh lỗi ánh xạ tham số đa phương thức của Gemini.
      - Dữ liệu hình ảnh được chuyển đổi sang Base64 JPEG và đóng gói trực tiếp vào payload request gửi đi cùng với chuỗi ngữ cảnh văn bản.
-   - *Tính minh bạch & Giao diện gỡ lỗi (Prompt Debugger):*
-     - Hệ thống tự động ghi nhận chính xác toàn bộ nội dung prompt thực tế đã gửi lên Gemini (bao gồm cả các thẻ ảnh Base64) vào trường `prompt_sent` trong bảng `ChatMessage`.
-     - Ở Frontend, người dùng có thể **double-click (nhấp đúp)** vào bất kỳ bong bóng tin nhắn nào của AI để hiển thị ngay lập tức một popup **Shadcn UI Dialog** chứa thông tin prompt chi tiết, giúp phục vụ việc kiểm thử, gỡ lỗi và đánh giá độ chính xác của ngữ cảnh.
+   - *Các API Gỡ lỗi & Trích xuất Tài nguyên mới:*
+     - **API Debug Ảnh (GET /api/documents/{id}/debug-images):** Trả về danh sách chi tiết tất cả các đối tượng đồ họa được phát hiện trên từng trang PDF kèm các thông tin như tên XObject, kích thước, định dạng, trạng thái được chấp nhận (accepted) và lý do từ chối cụ thể (filterReason - ví dụ: "Trùng lặp ở Tầng 2 (xuất hiện X lần)", "Kích thước quá nhỏ...").
+     - **API Trích xuất Ảnh gốc (GET /api/documents/{id}/pages/{pageNumber}/images/{imageName}):** Cho phép kết xuất động và tải xuống trực tiếp file ảnh gốc dưới định dạng PNG từ tài nguyên trang PDF, hỗ trợ việc hiển thị trực quan dữ liệu debug trên giao diện Frontend.
+   - *Giao diện Debug Mode & Trình kiểm thử ở Frontend:*
+     - Khi bật công tắc Chế độ Debug ở Sidebar, Frontend hiển thị danh sách các thẻ trang chứa hình ảnh dưới mỗi tài liệu. Click vào thẻ trang để nhảy ngay tới trang PDF tương ứng.
+     - Nút debug hình ảnh (icon con bọ Bug) hiển thị cạnh tên tài liệu sẽ mở ra một Dialog Debug Hình Ảnh chi tiết. Hộp thoại này tải dữ liệu từ /api/documents/{id}/debug-images và hiển thị trạng thái của từng đối tượng đồ họa trên các trang.
+     - Các ảnh được chấp nhận sẽ được render dưới dạng ảnh thumbnail thu nhỏ (sử dụng API trích xuất ảnh gốc ở trên). Người dùng có thể click vào thumbnail để phóng to ảnh thu được (Zoom View), giúp kiểm tra trực quan chất lượng trích xuất của hệ thống.
+   - *Tính minh bạch & Giao diện gỡ lỗi Prompt (Prompt Debugger):*
+     - Hệ thống tự động ghi nhận chính xác toàn bộ nội dung prompt thực tế đã gửi lên Gemini (bao gồm cả các thẻ ảnh Base64) vào trường prompt_sent trong bảng ChatMessage.
+     - Ở Frontend, người dùng có thể double-click (nhấp đúp) vào bất kỳ bong bóng tin nhắn nào của AI để hiển thị ngay lập tức một popup Shadcn UI Dialog chứa thông tin prompt chi tiết, giúp phục vụ việc kiểm thử, gỡ lỗi và đánh giá độ chính xác của ngữ cảnh.
    - *Xử lý an toàn khi xóa file (Robust Delete):*
-     - Triển khai cơ chế xử lý ngoại lệ thông minh khi xóa tài liệu khỏi Supabase Storage. Nếu file đã bị xóa trước đó trên Storage (lỗi 404/Object not found), hệ thống sẽ ghi log `WARN` thay vì `ERROR` và tiếp tục dọn dẹp sạch sẽ các bản ghi liên quan dưới database PostgreSQL để đảm bảo tính nhất quán của hệ thống.
+     - Triển khai cơ chế xử lý ngoại lệ thông minh khi xóa tài liệu khỏi Supabase Storage. Nếu file đã bị xóa trước đó trên Storage (lỗi 404/Object not found), hệ thống sẽ ghi log WARN và tiếp tục dọn dẹp sạch sẽ các bản ghi liên quan dưới database PostgreSQL để đảm bảo tính nhất quán của hệ thống.
