@@ -5,6 +5,7 @@ import com.mora.backend.exception.ErrorCode;
 import com.mora.backend.model.dto.response.DocumentDetailResponse;
 import com.mora.backend.model.dto.response.DocumentPageResponse;
 import com.mora.backend.model.dto.response.DocumentResponse;
+import com.mora.backend.model.dto.response.DocumentImageDebugResponse;
 import com.mora.backend.model.entity.Document;
 import com.mora.backend.model.entity.DocumentPage;
 import com.mora.backend.model.entity.Space;
@@ -131,14 +132,59 @@ public class DocumentServiceImpl implements DocumentService {
             try (PDDocument pdfDocument = Loader.loadPDF(file.getBytes())) {
                 int pageCount = pdfDocument.getNumberOfPages();
                 
+                // First pass: collect all Tier 1 accepted images
+                java.util.List<ImageInfoHolder> allImages = new java.util.ArrayList<>();
+                java.util.List<java.util.List<ImageInfoHolder>> pageImages = new java.util.ArrayList<>();
+                for (int i = 0; i < pageCount; i++) {
+                    pageImages.add(new java.util.ArrayList<>());
+                }
+
+                for (int i = 0; i < pageCount; i++) {
+                    PDPage pdfPage = pdfDocument.getPage(i);
+                    if (pdfPage.getResources() != null) {
+                        for (org.apache.pdfbox.cos.COSName name : pdfPage.getResources().getXObjectNames()) {
+                            if (pdfPage.getResources().isImageXObject(name)) {
+                                org.apache.pdfbox.pdmodel.graphics.PDXObject xobj = pdfPage.getResources().getXObject(name);
+                                if (xobj instanceof org.apache.pdfbox.pdmodel.graphics.image.PDImageXObject) {
+                                    org.apache.pdfbox.pdmodel.graphics.image.PDImageXObject image = 
+                                        (org.apache.pdfbox.pdmodel.graphics.image.PDImageXObject) xobj;
+                                    
+                                    ImageFilterResult tier1 = evaluateTier1(image.getWidth(), image.getHeight());
+                                    if (tier1.accepted) {
+                                        java.awt.image.BufferedImage bufferedImage = null;
+                                        try {
+                                            bufferedImage = image.getImage();
+                                        } catch (Exception e) {
+                                            log.warn("Failed to get buffered image: {}", e.getMessage());
+                                        }
+                                        if (bufferedImage != null) {
+                                            long pHash = calculatePerceptualHash(bufferedImage);
+                                            ImageInfoHolder holder = new ImageInfoHolder(image.getWidth(), image.getHeight(), pHash);
+                                            allImages.add(holder);
+                                            pageImages.get(i).add(holder);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Second pass: extract text and determine hasImage status based on uniqueness
                 PDFTextStripper textStripper = new PDFTextStripper();
                 for (int i = 1; i <= pageCount; i++) {
                     textStripper.setStartPage(i);
                     textStripper.setEndPage(i);
                     String pageContent = textStripper.getText(pdfDocument);
                     
-                    PDPage pdfPage = pdfDocument.getPage(i - 1);
-                    boolean hasImg = hasImages(pdfPage);
+                    boolean hasImg = false;
+                    for (ImageInfoHolder holder : pageImages.get(i - 1)) {
+                        int occurrences = countSimilarOccurrences(holder, allImages);
+                        if (occurrences == 1) {
+                            hasImg = true;
+                            break;
+                        }
+                    }
 
                     DocumentPage page = DocumentPage.builder()
                             .document(document)
@@ -178,16 +224,85 @@ public class DocumentServiceImpl implements DocumentService {
         return convertToDocumentResponse(document);
     }
 
-    private boolean hasImages(PDPage page) {
-        try {
-            if (page.getResources() == null) {
-                return false;
-            }
-            return page.getResources().getXObjectNames().iterator().hasNext();
-        } catch (Exception e) {
-            log.warn("Lỗi kiểm tra hình ảnh trên trang PDF", e);
+    private static class ImageFilterResult {
+        final boolean accepted;
+        final String reason;
+
+        ImageFilterResult(boolean accepted, String reason) {
+            this.accepted = accepted;
+            this.reason = reason;
         }
-        return false;
+    }
+
+    private ImageFilterResult evaluateTier1(int width, int height) {
+        if (width <= 200 || height <= 200) {
+            return new ImageFilterResult(false, "Kích thước quá nhỏ (<= 200px)");
+        }
+        double ratio = (double) width / height;
+        if (ratio > 3.0 || ratio < 0.33) {
+            return new ImageFilterResult(false, String.format("Tỉ lệ khung hình dị (rộng/cao = %.2f)", ratio));
+        }
+        return new ImageFilterResult(true, null);
+    }
+
+    private static class ImageInfoHolder {
+        final int width;
+        final int height;
+        final long pHash;
+
+        ImageInfoHolder(int width, int height, long pHash) {
+            this.width = width;
+            this.height = height;
+            this.pHash = pHash;
+        }
+    }
+
+    private long calculatePerceptualHash(java.awt.image.BufferedImage img) {
+        try {
+            java.awt.Image tmp = img.getScaledInstance(8, 8, java.awt.Image.SCALE_FAST);
+            java.awt.image.BufferedImage resized = new java.awt.image.BufferedImage(8, 8, java.awt.image.BufferedImage.TYPE_BYTE_GRAY);
+            java.awt.Graphics g = resized.getGraphics();
+            g.drawImage(tmp, 0, 0, null);
+            g.dispose();
+            
+            java.awt.image.Raster raster = resized.getRaster();
+            byte[] pixels = ((java.awt.image.DataBufferByte) raster.getDataBuffer()).getData();
+            
+            int sum = 0;
+            for (byte b : pixels) {
+                sum += (b & 0xFF);
+            }
+            int avg = sum / 64;
+            
+            long hash = 0;
+            for (int i = 0; i < 64; i++) {
+                if ((pixels[i] & 0xFF) >= avg) {
+                    hash |= (1L << i);
+                }
+            }
+            return hash;
+        } catch (Exception e) {
+            log.warn("Failed to calculate perceptual hash: {}", e.getMessage());
+            return 0L;
+        }
+    }
+
+    private boolean isVisuallySimilar(int w1, int h1, long hash1, int w2, int h2, long hash2) {
+        if (w1 != w2 || h1 != h2) {
+            return false;
+        }
+        int distance = Long.bitCount(hash1 ^ hash2);
+        return distance <= 10;
+    }
+
+    private int countSimilarOccurrences(ImageInfoHolder target, java.util.List<ImageInfoHolder> allImages) {
+        int count = 0;
+        for (ImageInfoHolder other : allImages) {
+            if (isVisuallySimilar(target.width, target.height, target.pHash, other.width, other.height, other.pHash)) {
+                count++;
+            }
+        }
+        return count;
     }
 
     @Override
@@ -339,6 +454,11 @@ public class DocumentServiceImpl implements DocumentService {
                 .storageUrl(document.getStorageUrl())
                 .createdAt(document.getCreatedAt())
                 .updatedAt(document.getUpdatedAt())
+                .pagesWithImages(document.getPages() != null ? document.getPages().stream()
+                        .filter(p -> Boolean.TRUE.equals(p.getHasImage()))
+                        .map(DocumentPage::getPageNumber)
+                        .sorted()
+                        .toList() : List.of())
                 .build();
     }
 
@@ -365,8 +485,8 @@ public class DocumentServiceImpl implements DocumentService {
         }
 
         try {
-            byte[] pdfBytes = downloadFile(document.getStorageUrl());
-            try (PDDocument pdfDocument = Loader.loadPDF(pdfBytes)) {
+            java.io.File cachedFile = getCachedPdfFile(documentId, document.getStorageUrl());
+            try (PDDocument pdfDocument = Loader.loadPDF(cachedFile)) {
                 if (pageNumber < 1 || pageNumber > pdfDocument.getNumberOfPages()) {
                     throw new IllegalArgumentException("Số trang không hợp lệ: " + pageNumber);
                 }
@@ -384,5 +504,194 @@ public class DocumentServiceImpl implements DocumentService {
         try (java.io.InputStream in = java.net.URI.create(urlString).toURL().openStream()) {
             return in.readAllBytes();
         }
+    }
+
+    private java.io.File getCachedPdfFile(Long documentId, String storageUrl) throws IOException {
+        java.io.File tempDir = new java.io.File(System.getProperty("java.io.tmpdir"), "mora-pdf-cache");
+        if (!tempDir.exists()) {
+            tempDir.mkdirs();
+        }
+        java.io.File cachedFile = new java.io.File(tempDir, documentId + ".pdf");
+        if (!cachedFile.exists()) {
+            log.info("Downloading PDF for document ID {} to local cache...", documentId);
+            byte[] pdfBytes = downloadFile(storageUrl);
+            java.nio.file.Files.write(cachedFile.toPath(), pdfBytes);
+        }
+        return cachedFile;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<DocumentImageDebugResponse> debugDocumentImages(Long id) {
+        Document document = documentRepository.findById(id)
+                .orElseThrow(() -> {
+                    log.warn("Document with ID {} not found for image debugging", id);
+                    return new AppException(ErrorCode.DOCUMENT_NOT_FOUND);
+                });
+
+        List<DocumentImageDebugResponse> debugList = new ArrayList<>();
+        if (!"pdf".equalsIgnoreCase(document.getFileType())) {
+            // Non-PDF is usually a single image
+            DocumentImageDebugResponse.ImageInfo imgInfo = DocumentImageDebugResponse.ImageInfo.builder()
+                    .name("Original Image")
+                    .type(document.getFileType())
+                    .width(0) // Unknown until decoded, but we can set 0
+                    .height(0)
+                    .accepted(true)
+                    .filterReason(null)
+                    .build();
+            debugList.add(DocumentImageDebugResponse.builder()
+                    .pageNumber(1)
+                    .images(List.of(imgInfo))
+                    .build());
+            return debugList;
+        }
+
+        try {
+            java.io.File cachedFile = getCachedPdfFile(id, document.getStorageUrl());
+            try (PDDocument pdfDocument = Loader.loadPDF(cachedFile)) {
+                int pageCount = pdfDocument.getNumberOfPages();
+                
+                // First pass: collect all Tier 1 accepted images with perceptual hashes
+                java.util.List<ImageInfoHolder> allImages = new java.util.ArrayList<>();
+                for (int i = 0; i < pageCount; i++) {
+                    PDPage pdfPage = pdfDocument.getPage(i);
+                    if (pdfPage.getResources() != null) {
+                        for (org.apache.pdfbox.cos.COSName name : pdfPage.getResources().getXObjectNames()) {
+                            if (pdfPage.getResources().isImageXObject(name)) {
+                                org.apache.pdfbox.pdmodel.graphics.PDXObject xobj = pdfPage.getResources().getXObject(name);
+                                if (xobj instanceof org.apache.pdfbox.pdmodel.graphics.image.PDImageXObject) {
+                                    org.apache.pdfbox.pdmodel.graphics.image.PDImageXObject image = 
+                                        (org.apache.pdfbox.pdmodel.graphics.image.PDImageXObject) xobj;
+                                    ImageFilterResult tier1 = evaluateTier1(image.getWidth(), image.getHeight());
+                                    if (tier1.accepted) {
+                                        java.awt.image.BufferedImage bufferedImage = null;
+                                        try {
+                                            bufferedImage = image.getImage();
+                                        } catch (Exception e) {
+                                            log.warn("Failed to get buffered image: {}", e.getMessage());
+                                        }
+                                        if (bufferedImage != null) {
+                                            long pHash = calculatePerceptualHash(bufferedImage);
+                                            allImages.add(new ImageInfoHolder(image.getWidth(), image.getHeight(), pHash));
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Second pass: build the debug response list
+                for (int i = 1; i <= pageCount; i++) {
+                    PDPage pdfPage = pdfDocument.getPage(i - 1);
+                    List<DocumentImageDebugResponse.ImageInfo> imagesOnPage = new ArrayList<>();
+                    if (pdfPage.getResources() != null) {
+                        for (org.apache.pdfbox.cos.COSName name : pdfPage.getResources().getXObjectNames()) {
+                            org.apache.pdfbox.pdmodel.graphics.PDXObject xobj = pdfPage.getResources().getXObject(name);
+                            String xObjectType = xobj != null ? xobj.getClass().getSimpleName() : "Unknown";
+                            
+                            int width = 0;
+                            int height = 0;
+                            boolean accepted = false;
+                            String filterReason = null;
+
+                            if (xobj instanceof org.apache.pdfbox.pdmodel.graphics.image.PDImageXObject) {
+                                org.apache.pdfbox.pdmodel.graphics.image.PDImageXObject image = 
+                                    (org.apache.pdfbox.pdmodel.graphics.image.PDImageXObject) xobj;
+                                width = image.getWidth();
+                                height = image.getHeight();
+                                
+                                ImageFilterResult tier1 = evaluateTier1(width, height);
+                                if (!tier1.accepted) {
+                                    accepted = false;
+                                    filterReason = tier1.reason;
+                                } else {
+                                    java.awt.image.BufferedImage bufferedImage = null;
+                                    try {
+                                        bufferedImage = image.getImage();
+                                    } catch (Exception e) {
+                                        log.warn("Failed to get buffered image: {}", e.getMessage());
+                                    }
+                                    if (bufferedImage != null) {
+                                        long pHash = calculatePerceptualHash(bufferedImage);
+                                        ImageInfoHolder target = new ImageInfoHolder(width, height, pHash);
+                                        int count = countSimilarOccurrences(target, allImages);
+                                        log.info("[DEBUG-IMAGE] Page: {}, Name: {}, Dim: {}x{}, Hash: {}, Occurrences: {}", 
+                                                 i, name.getName(), width, height, pHash, count);
+                                        if (count > 1) {
+                                            accepted = false;
+                                            filterReason = "Trùng lặp ở Tầng 2 (xuất hiện " + count + " lần)";
+                                        } else {
+                                            accepted = true;
+                                            filterReason = null;
+                                        }
+                                    } else {
+                                        accepted = false;
+                                        filterReason = "Không thể đọc dữ liệu hình ảnh (BufferedImage null)";
+                                    }
+                                }
+                            } else {
+                                filterReason = "Không phải đối tượng hình ảnh (XObject)";
+                            }
+
+                            imagesOnPage.add(DocumentImageDebugResponse.ImageInfo.builder()
+                                    .name(name.getName())
+                                    .type(xObjectType)
+                                    .width(width)
+                                    .height(height)
+                                    .accepted(accepted)
+                                    .filterReason(filterReason)
+                                    .build());
+                        }
+                    }
+                    debugList.add(DocumentImageDebugResponse.builder()
+                            .pageNumber(i)
+                            .images(imagesOnPage)
+                            .build());
+                }
+            }
+        } catch (IOException e) {
+            log.error("Failed to extract image debug details for document ID: {}", id, e);
+            throw new RuntimeException("Lỗi bóc tách ảnh để debug: " + e.getMessage(), e);
+        }
+
+        return debugList;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public byte[] extractImageResource(Long documentId, int pageNumber, String imageName) {
+        Document document = documentRepository.findById(documentId)
+                .orElseThrow(() -> {
+                    log.warn("Document with ID {} not found for image extraction", documentId);
+                    return new AppException(ErrorCode.DOCUMENT_NOT_FOUND);
+                });
+
+        try {
+            java.io.File cachedFile = getCachedPdfFile(documentId, document.getStorageUrl());
+            try (PDDocument pdfDocument = Loader.loadPDF(cachedFile)) {
+                if (pageNumber < 1 || pageNumber > pdfDocument.getNumberOfPages()) {
+                    throw new IllegalArgumentException("Số trang không hợp lệ: " + pageNumber);
+                }
+                PDPage pdfPage = pdfDocument.getPage(pageNumber - 1);
+                if (pdfPage.getResources() != null) {
+                    org.apache.pdfbox.cos.COSName cosName = org.apache.pdfbox.cos.COSName.getPDFName(imageName);
+                    org.apache.pdfbox.pdmodel.graphics.PDXObject xobj = pdfPage.getResources().getXObject(cosName);
+                    if (xobj instanceof org.apache.pdfbox.pdmodel.graphics.image.PDImageXObject) {
+                        org.apache.pdfbox.pdmodel.graphics.image.PDImageXObject image = 
+                            (org.apache.pdfbox.pdmodel.graphics.image.PDImageXObject) xobj;
+                        BufferedImage bufferedImage = image.getImage();
+                        java.io.ByteArrayOutputStream baos = new java.io.ByteArrayOutputStream();
+                        javax.imageio.ImageIO.write(bufferedImage, "png", baos);
+                        return baos.toByteArray();
+                    }
+                }
+            }
+        } catch (IOException e) {
+            log.error("Failed to extract image resource '{}' from document ID: {}, page: {}", imageName, documentId, pageNumber, e);
+            throw new RuntimeException("Lỗi trích xuất tài nguyên hình ảnh: " + e.getMessage(), e);
+        }
+        throw new RuntimeException("Không tìm thấy hình ảnh này trong tài liệu.");
     }
 }

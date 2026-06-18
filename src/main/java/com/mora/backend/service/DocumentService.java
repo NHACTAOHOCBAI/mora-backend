@@ -2,7 +2,9 @@ package com.mora.backend.service;
 
 import com.mora.backend.model.dto.response.DocumentDetailResponse;
 import com.mora.backend.model.dto.response.DocumentResponse;
+import com.mora.backend.model.dto.response.DocumentImageDebugResponse;
 import org.springframework.web.multipart.MultipartFile;
+import java.util.List;
 
 public interface DocumentService {
     /**
@@ -54,4 +56,22 @@ public interface DocumentService {
      * @return Byte array của ảnh (JPEG) đã tối ưu
      */
     byte[] renderPageImage(Long documentId, int pageNumber);
+
+    /**
+     * Trích xuất chi tiết thông tin ảnh đồ họa từng trang phục vụ debug.
+     *
+     * @param id ID tài liệu
+     * @return Danh sách thông tin ảnh từng trang
+     */
+    List<DocumentImageDebugResponse> debugDocumentImages(Long id);
+
+    /**
+     * Trích xuất trực tiếp tài nguyên hình ảnh (PDImageXObject) từ tệp PDF.
+     *
+     * @param documentId ID của tài liệu
+     * @param pageNumber Số trang
+     * @param imageName Tên của đối tượng ảnh (XObject name)
+     * @return Byte array của hình ảnh dạng PNG
+     */
+    byte[] extractImageResource(Long documentId, int pageNumber, String imageName);
 }

@@ -60,4 +60,23 @@ public class DocumentController {
         DocumentResponse response = documentService.renameDocument(id, request.getFileName());
         return ResponseEntity.ok(response);
     }
+
+    @GetMapping("/{id}/debug-images")
+    @Operation(summary = "Debug xem thông tin các đối tượng hình ảnh trên từng trang")
+    public ResponseEntity<java.util.List<com.mora.backend.model.dto.response.DocumentImageDebugResponse>> debugDocumentImages(@PathVariable("id") Long id) {
+        java.util.List<com.mora.backend.model.dto.response.DocumentImageDebugResponse> response = documentService.debugDocumentImages(id);
+        return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/{id}/pages/{pageNumber}/images/{imageName}")
+    @Operation(summary = "Trích xuất và trả về dữ liệu hình ảnh cụ thể của tài nguyên PDF")
+    public ResponseEntity<byte[]> extractImageResource(
+            @PathVariable("id") Long id,
+            @PathVariable("pageNumber") int pageNumber,
+            @PathVariable("imageName") String imageName) {
+        byte[] imageBytes = documentService.extractImageResource(id, pageNumber, imageName);
+        return ResponseEntity.ok()
+                .contentType(MediaType.IMAGE_PNG)
+                .body(imageBytes);
+    }
 }

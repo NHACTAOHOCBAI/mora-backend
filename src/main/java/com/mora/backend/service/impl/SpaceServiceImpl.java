@@ -7,6 +7,7 @@ import com.mora.backend.model.dto.response.DocumentResponse;
 import com.mora.backend.model.dto.response.SpaceDetailResponse;
 import com.mora.backend.model.dto.response.SpaceResponse;
 import com.mora.backend.model.entity.Space;
+import com.mora.backend.model.entity.DocumentPage;
 import com.mora.backend.repository.SpaceRepository;
 import com.mora.backend.service.SpaceService;
 import lombok.RequiredArgsConstructor;
@@ -61,6 +62,11 @@ public class SpaceServiceImpl implements SpaceService {
                         .storageUrl(doc.getStorageUrl())
                         .createdAt(doc.getCreatedAt())
                         .updatedAt(doc.getUpdatedAt())
+                        .pagesWithImages(doc.getPages().stream()
+                                .filter(p -> Boolean.TRUE.equals(p.getHasImage()))
+                                .map(DocumentPage::getPageNumber)
+                                .sorted()
+                                .toList())
                         .build())
                 .toList();
 

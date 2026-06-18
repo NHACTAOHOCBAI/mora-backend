@@ -92,12 +92,17 @@ Sau khi khởi chạy ứng dụng thành công, tài liệu Swagger UI sẽ kh�
 *   Đã cài đặt **Maven 3.9+**.
 *   Đã cài đặt **Docker** & **Docker Compose**.
 
-### 2. Khởi chạy Database
-Dự án sử dụng PostgreSQL chạy trong Docker container thông qua file `docker-compose.yml` ở cổng `5433`:
+### 2. Khởi chạy Database & Công cụ quản trị (pgAdmin)
+Dự án sử dụng PostgreSQL chạy trong Docker container thông qua file `docker-compose.yml` ở cổng `5433`, đi kèm công cụ quản trị **pgAdmin 4** ở cổng `5050`:
 
 ```bash
 docker compose up -d
 ```
+
+*   **PostgreSQL:** Hoạt động trên cổng `5433` (`localhost:5433`).
+*   **pgAdmin 4:** Truy cập tại **[http://localhost:5050](http://localhost:5050)**.
+    *   **Tài khoản đăng nhập:** Email `admin@mora.com` / Mật khẩu `admin`
+    *   **Kết nối Database từ pgAdmin:** Sử dụng Host name `postgres`, Port `5432`, Maintenance database `mora_db`, Username `postgres`, Password `postgres`.
 
 ### 3. Cấu hình Ứng dụng
 Tạo file `.env` ở thư mục gốc của backend (hoặc cấu hình các biến môi trường trực tiếp) dựa trên file `.env.example`:
