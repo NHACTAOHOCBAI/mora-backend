@@ -24,7 +24,6 @@ public class GeminiConfig {
                 .apiKey(apiKey)
                 .modelName(modelName)
                 .temperature(temperature)
-                .timeout(java.time.Duration.ofSeconds(180))
                 .maxRetries(3)
                 .build();
     }
