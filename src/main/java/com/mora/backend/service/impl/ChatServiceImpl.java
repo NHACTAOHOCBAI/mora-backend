@@ -20,11 +20,7 @@ import com.mora.backend.service.ChatService;
 import com.mora.backend.service.DocumentService;
 import java.util.Base64;
 import java.util.ArrayList;
-import dev.langchain4j.model.chat.ChatLanguageModel;
-import dev.langchain4j.service.AiServices;
-import dev.langchain4j.service.SystemMessage;
-import dev.langchain4j.service.UserMessage;
-import dev.langchain4j.service.V;
+import com.mora.backend.client.AiServiceClient;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.core.type.TypeReference;
 import lombok.RequiredArgsConstructor;
@@ -43,123 +39,11 @@ public class ChatServiceImpl implements ChatService {
     private final DocumentPageRepository documentPageRepository;
     private final SpaceRepository spaceRepository;
     private final ChatMessageRepository chatMessageRepository;
-    private final ChatLanguageModel chatLanguageModel;
+    private final AiServiceClient aiServiceClient;
     private final DocumentService documentService;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
-    // Interface dùng cho LangChain4j AiServices để tự động hóa Prompt và Structured Outputs
-    interface GeminiAssistant {
-        @SystemMessage("""
-            Bạn là một trợ lý học thuật nghiêm khắc.
-            Hãy trả lời câu hỏi của người dùng CHỈ sử dụng thông tin từ ngữ cảnh tài liệu được cung cấp dưới đây (bao gồm cả nội dung văn bản và hình ảnh của tài liệu đó).
-            Nếu tài liệu có hình ảnh đính kèm (hoặc bản thân tài liệu là hình ảnh), hãy phân tích kỹ hình ảnh và bạn ĐƯỢC PHÉP suy luận logic dựa trên hình ảnh để trả lời câu hỏi của người dùng.
-            Nếu thông tin trong tài liệu (cả phần chữ và phần hình ảnh) không đủ hoặc câu hỏi nằm ngoài phạm vi tài liệu, bạn bắt buộc phải trả lời 'false' cho trường 'answerFound', không được tự ý đoán mò, và đặt 'answer' thành câu từ chối trả lời phù hợp (Ví dụ: "Tôi không tìm thấy thông tin này trong tài liệu.").
-            """)
-        @UserMessage("""
-            Ngữ cảnh tài liệu:
-            {{context}}
-            
-            Câu hỏi: {{question}}
-            """)
-        DocumentChatResponse chat(@V("context") String context, @V("question") String question);
 
-        @SystemMessage("""
-            Bạn là một trợ lý học thuật nghiêm khắc.
-            Hãy trả lời câu hỏi của người dùng CHỈ sử dụng thông tin từ ngữ cảnh tài liệu được cung cấp dưới đây (bao gồm cả nội dung văn bản và hình ảnh của tài liệu đó).
-            Nếu tài liệu có hình ảnh đính kèm (hoặc bản thân tài liệu là hình ảnh), hãy phân tích kỹ hình ảnh và bạn ĐƯỢC PHÉP suy luận logic dựa trên hình ảnh để trả lời câu hỏi của người dùng.
-            Nếu thông tin trong tài liệu (cả phần chữ và phần hình ảnh) không đủ hoặc câu hỏi nằm ngoài phạm vi tài liệu, bạn bắt buộc phải trả lời 'false' cho trường 'answerFound', không được tự ý đoán mò, và đặt 'answer' thành câu từ chối trả lời phù hợp (Ví dụ: "Tôi không tìm thấy thông tin này trong tài liệu.").
-            """)
-        @UserMessage("""
-            Ngữ cảnh tài liệu:
-            {{context}}
-            
-            Câu hỏi: {{question}}
-            
-            {{image}}
-            """)
-        DocumentChatResponse chatWithImage(@V("context") String context, @V("question") String question, @V("image") dev.langchain4j.data.image.Image image);
-    }
-
-    interface SpaceAssistant {
-        @SystemMessage("""
-            Bạn là một trợ lý học thuật nghiêm khắc.
-            Hãy trả lời câu hỏi của người dùng CHỈ sử dụng thông tin từ ngữ cảnh tài liệu được cung cấp dưới đây (bao gồm cả nội dung văn bản và hình ảnh của tài liệu đó).
-            Ngữ cảnh chứa nhiều tài liệu khác nhau. Mỗi tài liệu được phân tách bằng '--- BẮT ĐẦU FILE: ID [id_cua_file], TÊN [tên file] ---' và '--- KẾT THÚC FILE...'.
-            Nếu tài liệu có hình ảnh đính kèm (hoặc bản thân tài liệu là hình ảnh), hãy phân tích kỹ hình ảnh và bạn ĐƯỢC PHÉP suy luận logic dựa trên hình ảnh để trả lời câu hỏi của người dùng.
-            Nếu thông tin trong các tài liệu (cả phần chữ và phần hình ảnh) không đủ hoặc câu hỏi nằm ngoài phạm vi tài liệu, bạn bắt buộc phải trả lời 'false' cho trường 'answerFound', không được tự ý đoán mò, và đặt 'answer' thành câu từ chối trả lời phù hợp (Ví dụ: "Tôi không tìm thấy thông tin này trong các tài liệu của không gian học tập.").
-            Trong mảng trích dẫn (citations), với mỗi trích dẫn bạn phải cung cấp chính xác 'documentId' (lấy từ ID [id_cua_file] trong tiêu đề file tương ứng) và 'pageNumber' của trang chứa câu trích dẫn đó.
-            """)
-        @UserMessage("""
-            Ngữ cảnh tài liệu:
-            {{context}}
-            
-            Câu hỏi: {{question}}
-            """)
-        SpaceChatResponse chat(@V("context") String context, @V("question") String question);
-
-        @SystemMessage("""
-            Bạn là một trợ lý học thuật nghiêm khắc.
-            Hãy trả lời câu hỏi của người dùng CHỈ sử dụng thông tin từ ngữ cảnh tài liệu được cung cấp dưới đây (bao gồm cả nội dung văn bản và hình ảnh của tài liệu đó).
-            Ngữ cảnh chứa nhiều tài liệu khác nhau. Mỗi tài liệu được phân tách bằng '--- BẮT ĐẦU FILE: ID [id_cua_file], TÊN [tên file] ---' và '--- KẾT THÚC FILE...'.
-            Nếu tài liệu có hình ảnh đính kèm (hoặc bản thân tài liệu là hình ảnh), hãy phân tích kỹ hình ảnh và bạn ĐƯỢC PHÉP suy luận logic dựa trên hình ảnh để trả lời câu hỏi của người dùng.
-            Nếu thông tin trong các tài liệu (cả phần chữ và phần hình ảnh) không đủ hoặc câu hỏi nằm ngoài phạm vi tài liệu, bạn bắt buộc phải trả lời 'false' cho trường 'answerFound', không được tự ý đoán mò, và đặt 'answer' thành câu từ chối trả lời phù hợp (Ví dụ: "Tôi không tìm thấy thông tin này trong các tài liệu của không gian học tập.").
-            Trong mảng trích dẫn (citations), với mỗi trích dẫn bạn phải cung cấp chính xác 'documentId' (lấy từ ID [id_cua_file] trong tiêu đề file tương ứng) và 'pageNumber' của trang chứa câu trích dẫn đó.
-            """)
-        @UserMessage("""
-            Ngữ cảnh tài liệu:
-            {{context}}
-            
-            Câu hỏi: {{question}}
-            
-            {{images}}
-            """)
-        SpaceChatResponse chatWithImages(@V("context") String context, @V("question") String question, @V("images") List<dev.langchain4j.data.image.Image> images);
-    }
-
-    // Interface dùng để rút gọn câu hỏi nối tiếp dựa trên lịch sử
-    interface QuestionCondenser {
-        @SystemMessage("""
-            Bạn là một trợ lý ngôn ngữ AI thông minh.
-            Nhiệm vụ của bạn là kết hợp lịch sử cuộc trò chuyện gần nhất và câu hỏi mới của người dùng thành một "Câu hỏi độc lập" (Standalone Question) hoàn chỉnh, rõ nghĩa, và tự chứa đầy đủ ngữ cảnh để có thể dùng truy vấn trực tiếp vào tài liệu.
-            - Không được trả lời câu hỏi, CHỈ được viết lại câu hỏi.
-            - Giữ nguyên ngôn ngữ của câu hỏi gốc (nếu là Tiếng Việt thì viết lại bằng Tiếng Việt).
-            - Nếu câu hỏi mới đã đầy đủ nghĩa và không phụ thuộc vào lịch sử chat, hãy trả về chính xác câu hỏi mới đó.
-            """)
-        @UserMessage("""
-            Lịch sử trò chuyện:
-            {{history}}
-            
-            Câu hỏi mới: {{question}}
-            
-            Hãy viết lại câu hỏi độc lập:
-            """)
-        String condense(@V("history") String history, @V("question") String question);
-    }
-
-    private String getCondensedQuestion(List<ChatMessageDto> history, String question) {
-        if (history == null || history.isEmpty()) {
-            return question;
-        }
-
-        StringBuilder historyBuilder = new StringBuilder();
-        for (ChatMessageDto msg : history) {
-            String role = "user".equalsIgnoreCase(msg.getSender()) ? "User" : "Assistant";
-            historyBuilder.append(role).append(": ").append(msg.getText()).append("\n");
-        }
-
-        try {
-            QuestionCondenser condenser = AiServices.builder(QuestionCondenser.class)
-                    .chatLanguageModel(chatLanguageModel)
-                    .build();
-            String rewritten = condenser.condense(historyBuilder.toString(), question);
-            if (rewritten != null && !rewritten.trim().isEmpty()) {
-                return rewritten.trim();
-            }
-        } catch (Exception e) {
-            log.error("Failed to condense question, falling back to original question", e);
-        }
-        return question;
-    }
 
     @Override
     @Transactional
@@ -192,7 +76,6 @@ public class ChatServiceImpl implements ChatService {
         chatMessageRepository.save(userMessage);
 
         // 3. Kiểm tra và chuẩn bị ảnh để gửi kèm nếu có trang chứa hình ảnh (Đưa lên trước để đưa vào debugContext)
-        dev.langchain4j.data.image.Image imageToSend = null;
         String base64Image = null;
         DocumentPage pageWithImage = null;
         boolean isPdf = "pdf".equalsIgnoreCase(document.getFileType());
@@ -202,10 +85,6 @@ public class ChatServiceImpl implements ChatService {
                 byte[] imageBytes = documentService.renderPageImage(document.getId(), 1);
                 if (imageBytes != null && imageBytes.length > 0) {
                     base64Image = Base64.getEncoder().encodeToString(imageBytes);
-                    imageToSend = dev.langchain4j.data.image.Image.builder()
-                            .base64Data(base64Image)
-                            .mimeType("image/jpeg")
-                            .build();
                 }
             } catch (Exception e) {
                 log.warn("Lỗi khi kết xuất ảnh cho tài liệu hình ảnh", e);
@@ -236,10 +115,6 @@ public class ChatServiceImpl implements ChatService {
                     byte[] imageBytes = documentService.renderPageImage(document.getId(), pageWithImage.getPageNumber());
                     if (imageBytes != null && imageBytes.length > 0) {
                         base64Image = Base64.getEncoder().encodeToString(imageBytes);
-                        imageToSend = dev.langchain4j.data.image.Image.builder()
-                                .base64Data(base64Image)
-                                .mimeType("image/jpeg")
-                                .build();
                         log.info("Đã tự động gửi kèm ảnh của trang {} để trợ giúp hỏi đáp", pageWithImage.getPageNumber());
                     }
                 } catch (Exception e) {
@@ -283,48 +158,31 @@ public class ChatServiceImpl implements ChatService {
                         .build())
                 .toList();
 
-        String condensedQuestion = getCondensedQuestion(historyDtoList, request.getQuestion());
-
-        // 6. Tạo AI Assistant thông qua LangChain4j AiServices
-        GeminiAssistant assistant = AiServices.builder(GeminiAssistant.class)
-                .chatLanguageModel(chatLanguageModel)
-                .build();
-
-        String fullPrompt = String.format("""
-                [SYSTEM PROMPT]
-                Bạn là một trợ lý học thuật nghiêm khắc.
-                Hãy trả lời câu hỏi của người dùng CHỈ sử dụng thông tin từ ngữ cảnh tài liệu được cung cấp dưới đây (bao gồm cả nội dung văn bản và hình ảnh của tài liệu đó).
-                Nếu tài liệu có hình ảnh đính kèm (hoặc bản thân tài liệu là hình ảnh), hãy phân tích kỹ hình ảnh và bạn ĐƯỢC PHÉP suy luận logic dựa trên hình ảnh để trả lời câu hỏi của người dùng.
-                Nếu thông tin trong tài liệu (cả phần chữ và phần hình ảnh) không đủ hoặc câu hỏi nằm ngoài phạm vi tài liệu, bạn bắt buộc phải trả lời 'false' cho trường 'answerFound', không được tự ý đoán mò, và đặt 'answer' thành câu từ chối trả lời phù hợp (Ví dụ: "Tôi không tìm thấy thông tin này trong tài liệu.").
-                
-                [USER MESSAGE]
-                Ngữ cảnh tài liệu:
-                %s
-                
-                Câu hỏi: %s""", debugContext, condensedQuestion);
-
-        // 7. Gọi Gemini và nhận kết quả cấu trúc
+        // 6. Gọi Python AI service qua Client
         try {
-            DocumentChatResponse response;
-            if (imageToSend != null) {
-                logGeminiRequest(
-                        "Bạn là một trợ lý học thuật nghiêm khắc.\nHãy trả lời câu hỏi của người dùng CHỈ sử dụng thông tin từ ngữ cảnh tài liệu được cung cấp dưới đây (bao gồm cả nội dung văn bản và hình ảnh của tài liệu đó).\nNếu tài liệu có hình ảnh đính kèm (hoặc bản thân tài liệu là hình ảnh), hãy phân tích kỹ hình ảnh và bạn ĐƯỢC PHÉP suy luận logic dựa trên hình ảnh để trả lời câu hỏi của người dùng.\nNếu thông tin trong tài liệu (cả phần chữ và phần hình ảnh) không đủ hoặc câu hỏi nằm ngoài phạm vi tài liệu, bạn bắt buộc phải trả lời 'false' cho trường 'answerFound', không được tự ý đoán mò, và đặt 'answer' thành câu từ chối trả lời phù hợp (Ví dụ: \"Tôi không tìm thấy thông tin này trong tài liệu.\").",
-                        context,
-                        condensedQuestion,
-                        List.of(base64Image)
-                );
-                response = assistant.chatWithImage(context, condensedQuestion, imageToSend);
-            } else {
-                logGeminiRequest(
-                        "Bạn là một trợ lý học thuật nghiêm khắc.\nHãy trả lời câu hỏi của người dùng CHỈ sử dụng thông tin từ ngữ cảnh tài liệu được cung cấp dưới đây (bao gồm cả nội dung văn bản và hình ảnh của tài liệu đó).\nNếu tài liệu có hình ảnh đính kèm (hoặc bản thân tài liệu là hình ảnh), hãy phân tích kỹ hình ảnh và bạn ĐƯỢC PHÉP suy luận logic dựa trên hình ảnh để trả lời câu hỏi của người dùng.\nNếu thông tin trong tài liệu (cả phần chữ và phần hình ảnh) không đủ hoặc câu hỏi nằm ngoài phạm vi tài liệu, bạn bắt buộc phải trả lời 'false' cho trường 'answerFound', không được tự ý đoán mò, và đặt 'answer' thành câu từ chối trả lời phù hợp (Ví dụ: \"Tôi không tìm thấy thông tin này trong tài liệu.\").",
-                        context,
-                        condensedQuestion,
-                        null
-                );
-                response = assistant.chat(context, condensedQuestion);
-            }
+            logGeminiRequest(
+                    "Bạn là một trợ lý học thuật nghiêm khắc.\nHãy trả lời câu hỏi của người dùng CHỈ sử dụng thông tin từ ngữ cảnh tài liệu được cung cấp dưới đây (bao gồm cả nội dung văn bản và hình ảnh của tài liệu đó).\nNếu tài liệu có hình ảnh đính kèm (hoặc bản thân tài liệu là hình ảnh), hãy phân tích kỹ hình ảnh và bạn ĐƯỢC PHÉP suy luận logic dựa trên hình ảnh để trả lời câu hỏi của người dùng.\nNếu thông tin trong tài liệu (cả phần chữ và phần hình ảnh) không đủ hoặc câu hỏi nằm ngoài phạm vi tài liệu, bạn bắt buộc phải trả lời 'false' cho trường 'answerFound', không được tự ý đoán mò, và đặt 'answer' thành câu từ chối trả lời phù hợp (Ví dụ: \"Tôi không tìm thấy thông tin này trong tài liệu.\").",
+                    context,
+                    request.getQuestion(),
+                    base64Image != null ? List.of(base64Image) : null
+            );
             
-            response.setCondensedQuestion(condensedQuestion);
+            DocumentChatResponse response = aiServiceClient.chatWithDocument(context, request.getQuestion(), base64Image, historyDtoList);
+            
+            String actualCondensedQuestion = response.getCondensedQuestion() != null ? response.getCondensedQuestion() : request.getQuestion();
+            String fullPrompt = String.format("""
+                    [SYSTEM PROMPT]
+                    Bạn là một trợ lý học thuật nghiêm khắc.
+                    Hãy trả lời câu hỏi của người dùng CHỈ sử dụng thông tin từ ngữ cảnh tài liệu được cung cấp dưới đây (bao gồm cả nội dung văn bản và hình ảnh của tài liệu đó).
+                    Nếu tài liệu có hình ảnh đính kèm (hoặc bản thân tài liệu là hình ảnh), hãy phân tích kỹ hình ảnh và bạn ĐƯỢC PHÉP suy luận logic dựa trên hình ảnh để trả lời câu hỏi của người dùng.
+                    Nếu thông tin trong tài liệu (cả phần chữ và phần hình ảnh) không đủ hoặc câu hỏi nằm ngoài phạm vi tài liệu, bạn bắt buộc phải trả lời 'false' cho trường 'answerFound', không được tự ý đoán mò, và đặt 'answer' thành câu từ chối trả lời phù hợp (Ví dụ: "Tôi không tìm thấy thông tin này trong tài liệu.").
+                    
+                    [USER MESSAGE]
+                    Ngữ cảnh tài liệu:
+                    %s
+                    
+                    Câu hỏi: %s""", debugContext, actualCondensedQuestion);
+
             response.setPromptSent(fullPrompt);
             if (response.getCitations() != null) {
                 for (DocumentChatResponse.Citation citation : response.getCitations()) {
@@ -349,14 +207,14 @@ public class ChatServiceImpl implements ChatService {
                     .document(document)
                     .space(document.getSpace())
                     .citations(citationsJson)
-                    .condensedQuestion(condensedQuestion)
+                    .condensedQuestion(actualCondensedQuestion)
                     .promptSent(fullPrompt)
                     .build();
             chatMessageRepository.save(assistantMessage);
 
             return response;
         } catch (Exception e) {
-            log.error("Error occurred while calling Gemini API via LangChain4j", e);
+            log.error("Error occurred while calling Gemini API via Python service", e);
             throw new RuntimeException("Lỗi kết nối hoặc xử lý từ AI Engine: " + e.getMessage(), e);
         }
     }
@@ -406,7 +264,6 @@ public class ChatServiceImpl implements ChatService {
         chatMessageRepository.save(userMessage);
 
         // 3. Kiểm tra và chuẩn bị ảnh từ các trang chứa hình ảnh (tối đa 3 ảnh) (Đưa lên trước để đưa vào debugContext)
-        List<dev.langchain4j.data.image.Image> imagesToSend = new ArrayList<>();
         List<String> base64Images = new ArrayList<>();
         java.util.Map<String, String> pageImageMap = new java.util.HashMap<>();
         int imageCount = 0;
@@ -416,11 +273,6 @@ public class ChatServiceImpl implements ChatService {
                     byte[] imageBytes = documentService.renderPageImage(page.getDocument().getId(), page.getPageNumber());
                     if (imageBytes != null && imageBytes.length > 0) {
                         String base64Str = Base64.getEncoder().encodeToString(imageBytes);
-                        dev.langchain4j.data.image.Image imgObj = dev.langchain4j.data.image.Image.builder()
-                                .base64Data(base64Str)
-                                .mimeType("image/jpeg")
-                                .build();
-                        imagesToSend.add(imgObj);
                         base64Images.add(base64Str);
                         
                         String key = page.getDocument().getId() + "_" + page.getPageNumber();
@@ -482,50 +334,33 @@ public class ChatServiceImpl implements ChatService {
                         .build())
                 .toList();
 
-        String condensedQuestion = getCondensedQuestion(historyDtoList, request.getQuestion());
-
-        // 6. Tạo AI Assistant thông qua LangChain4j AiServices
-        SpaceAssistant assistant = AiServices.builder(SpaceAssistant.class)
-                .chatLanguageModel(chatLanguageModel)
-                .build();
-
-        String fullPrompt = String.format("""
-                [SYSTEM PROMPT]
-                Bạn là một trợ lý học thuật nghiêm khắc.
-                Hãy trả lời câu hỏi của người dùng CHỈ sử dụng thông tin từ ngữ cảnh tài liệu được cung cấp dưới đây (bao gồm cả nội dung văn bản và hình ảnh của tài liệu đó).
-                Ngữ cảnh chứa nhiều tài liệu khác nhau. Mỗi tài liệu được phân tách bằng '--- BẮT ĐẦU FILE: ID [id_cua_file], TÊN [tên file] ---' và '--- KẾT THÚC FILE...'.
-                Nếu tài liệu có hình ảnh đính kèm (hoặc bản thân tài liệu là hình ảnh), hãy phân tích kỹ hình ảnh và bạn ĐƯỢC PHÉP suy luận logic dựa trên hình ảnh để trả lời câu hỏi của người dùng.
-                Nếu thông tin trong các tài liệu (cả phần chữ và phần hình ảnh) không đủ hoặc câu hỏi nằm ngoài phạm vi tài liệu, bạn bắt buộc phải trả lời 'false' cho trường 'answerFound', không được tự ý đoán mò, và đặt 'answer' thành câu từ chối trả lời phù hợp (Ví dụ: "Tôi không tìm thấy thông tin này trong các tài liệu của không gian học tập.").
-                Trong mảng trích dẫn (citations), với mỗi trích dẫn bạn phải cung cấp chính xác 'documentId' (lấy từ ID [id_cua_file] trong tiêu đề file tương ứng) và 'pageNumber' của trang chứa câu trích dẫn đó.
-                
-                [USER MESSAGE]
-                Ngữ cảnh tài liệu:
-                %s
-                
-                Câu hỏi: %s""", debugContext, condensedQuestion);
-
-        // 7. Gọi Gemini và nhận kết quả cấu trúc
+        // 6. Gọi Python AI service qua Client
         try {
-            SpaceChatResponse response;
-            if (!imagesToSend.isEmpty()) {
-                logGeminiRequest(
-                        "Bạn là một trợ lý học thuật nghiêm khắc.\nHãy trả lời câu hỏi của người dùng CHỈ sử dụng thông tin từ ngữ cảnh tài liệu được cung cấp dưới đây (bao gồm cả nội dung văn bản và hình ảnh của tài liệu đó).\nNgữ cảnh chứa nhiều tài liệu khác nhau. Mỗi tài liệu được phân tách bằng '--- BẮT ĐẦU FILE: ID [id_cua_file], TÊN [tên file] ---' và '--- KẾT THÚC FILE...'.\nNếu tài liệu có hình ảnh đính kèm (hoặc bản thân tài liệu là hình ảnh), hãy phân tích kỹ hình ảnh và bạn ĐƯỢC PHÉP suy luận logic dựa trên hình ảnh để trả lời câu hỏi của người dùng.\nNếu thông tin trong các tài liệu (cả phần chữ và phần hình ảnh) không đủ hoặc câu hỏi nằm ngoài phạm vi tài liệu, bạn bắt buộc phải trả lời 'false' cho trường 'answerFound', không được tự ý đoán mò, và đặt 'answer' thành câu từ chối trả lời phù hợp (Ví dụ: \"Tôi không tìm thấy thông tin này trong các tài liệu của không gian học tập.\").\nTrong mảng trích dẫn (citations), với mỗi trích dẫn bạn phải cung cấp chính xác 'documentId' (lấy từ ID [id_cua_file] trong tiêu đề file tương ứng) và 'pageNumber' của trang chứa câu trích dẫn đó.",
-                        context,
-                        condensedQuestion,
-                        base64Images
-                );
-                response = assistant.chatWithImages(context, condensedQuestion, imagesToSend);
-            } else {
-                logGeminiRequest(
-                        "Bạn là một trợ lý học thuật nghiêm khắc.\nHãy trả lời câu hỏi của người dùng CHỈ sử dụng thông tin từ ngữ cảnh tài liệu được cung cấp dưới đây (bao gồm cả nội dung văn bản và hình ảnh của tài liệu đó).\nNgữ cảnh chứa nhiều tài liệu khác nhau. Mỗi tài liệu được phân tách bằng '--- BẮT ĐẦU FILE: ID [id_cua_file], TÊN [tên file] ---' và '--- KẾT THÚC FILE...'.\nNếu tài liệu có hình ảnh đính kèm (hoặc bản thân tài liệu là hình ảnh), hãy phân tích kỹ hình ảnh và bạn ĐƯỢC PHÉP suy luận logic dựa trên hình ảnh để trả lời câu hỏi của người dùng.\nNếu thông tin trong các tài liệu (cả phần chữ và phần hình ảnh) không đủ hoặc câu hỏi nằm ngoài phạm vi tài liệu, bạn bắt buộc phải trả lời 'false' cho trường 'answerFound', không được tự ý đoán mò, và đặt 'answer' thành câu từ chối trả lời phù hợp (Ví dụ: \"Tôi không tìm thấy thông tin này trong các tài liệu của không gian học tập.\").\nTrong mảng trích dẫn (citations), với mỗi trích dẫn bạn phải cung cấp chính xác 'documentId' (lấy từ ID [id_cua_file] trong tiêu đề file tương ứng) và 'pageNumber' của trang chứa câu trích dẫn đó.",
-                        context,
-                        condensedQuestion,
-                        null
-                );
-                response = assistant.chat(context, condensedQuestion);
-            }
+            logGeminiRequest(
+                    "Bạn là một trợ lý học thuật nghiêm khắc.\nHãy trả lời câu hỏi của người dùng CHỈ sử dụng thông tin từ ngữ cảnh tài liệu được cung cấp dưới đây (bao gồm cả nội dung văn bản và hình ảnh của tài liệu đó).\nNgữ cảnh chứa nhiều tài liệu khác nhau. Mỗi tài liệu được phân tách bằng '--- BẮT ĐẦU FILE: ID [id_cua_file], TÊN [tên file] ---' và '--- KẾT THÚC FILE...'.\nNếu tài liệu có hình ảnh đính kèm (hoặc bản thân tài liệu là hình ảnh), hãy phân tích kỹ hình ảnh và bạn ĐƯỢC PHÉP suy luận logic dựa trên hình ảnh để trả lời câu hỏi của người dùng.\nNếu thông tin trong các tài liệu (cả phần chữ và phần hình ảnh) không đủ hoặc câu hỏi nằm ngoài phạm vi tài liệu, bạn bắt buộc phải trả lời 'false' cho trường 'answerFound', không được tự ý đoán mò, và đặt 'answer' thành câu từ chối trả lời phù hợp (Ví dụ: \"Tôi không tìm thấy thông tin này trong các tài liệu của không gian học tập.\").\nTrong mảng trích dẫn (citations), với mỗi trích dẫn bạn phải cung cấp chính xác 'documentId' (lấy từ ID [id_cua_file] trong tiêu đề file tương ứng) và 'pageNumber' của trang chứa câu trích dẫn đó.",
+                    context,
+                    request.getQuestion(),
+                    base64Images
+            );
             
-            response.setCondensedQuestion(condensedQuestion);
+            SpaceChatResponse response = aiServiceClient.chatWithSpace(context, request.getQuestion(), base64Images, historyDtoList);
+            
+            String actualCondensedQuestion = response.getCondensedQuestion() != null ? response.getCondensedQuestion() : request.getQuestion();
+            String fullPrompt = String.format("""
+                    [SYSTEM PROMPT]
+                    Bạn là một trợ lý học thuật nghiêm khắc.
+                    Hãy trả lời câu hỏi của người dùng CHỈ sử dụng thông tin từ ngữ cảnh tài liệu được cung cấp dưới đây (bao gồm cả nội dung văn bản và hình ảnh của tài liệu đó).
+                    Ngữ cảnh chứa nhiều tài liệu khác nhau. Mỗi tài liệu được phân tách bằng '--- BẮT ĐẦU FILE: ID [id_cua_file], TÊN [tên file] ---' và '--- KẾT THÚC FILE...'.
+                    Nếu tài liệu có hình ảnh đính kèm (hoặc bản thân tài liệu là hình ảnh), hãy phân tích kỹ hình ảnh và bạn ĐƯỢC PHÉP suy luận logic dựa trên hình ảnh để trả lời câu hỏi của người dùng.
+                    Nếu thông tin trong các tài liệu (cả phần chữ và phần hình ảnh) không đủ hoặc câu hỏi nằm ngoài phạm vi tài liệu, bạn bắt buộc phải trả lời 'false' cho trường 'answerFound', không được tự ý đoán mò, và đặt 'answer' thành câu từ chối trả lời phù hợp (Ví dụ: "Tôi không tìm thấy thông tin này trong các tài liệu của không gian học tập.").
+                    Trong mảng trích dẫn (citations), với mỗi trích dẫn bạn phải cung cấp chính xác 'documentId' (lấy từ ID [id_cua_file] trong tiêu đề file tương ứng) và 'pageNumber' của trang chứa câu trích dẫn đó.
+                    
+                    [USER MESSAGE]
+                    Ngữ cảnh tài liệu:
+                    %s
+                    
+                    Câu hỏi: %s""", debugContext, actualCondensedQuestion);
+
             response.setPromptSent(fullPrompt);
             if (response.getCitations() != null) {
                 for (SpaceChatResponse.SpaceCitation citation : response.getCitations()) {
@@ -552,14 +387,14 @@ public class ChatServiceImpl implements ChatService {
                     .document(null)
                     .space(space)
                     .citations(citationsJson)
-                    .condensedQuestion(condensedQuestion)
+                    .condensedQuestion(actualCondensedQuestion)
                     .promptSent(fullPrompt)
                     .build();
             chatMessageRepository.save(assistantMessage);
 
             return response;
         } catch (Exception e) {
-            log.error("Error occurred while calling Gemini API via LangChain4j for space", e);
+            log.error("Error occurred while calling Gemini API via Python service for space", e);
             throw new RuntimeException("Lỗi kết nối hoặc xử lý từ AI Engine: " + e.getMessage(), e);
         }
     }

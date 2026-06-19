@@ -15,11 +15,8 @@ import com.mora.backend.repository.DocumentRepository;
 import com.mora.backend.repository.ChatMessageRepository;
 import com.mora.backend.service.DocumentService;
 import com.mora.backend.service.StorageService;
-import dev.langchain4j.model.chat.ChatLanguageModel;
-import dev.langchain4j.service.AiServices;
-import dev.langchain4j.service.SystemMessage;
-import dev.langchain4j.service.UserMessage;
-import dev.langchain4j.service.V;
+import com.mora.backend.client.AiServiceClient;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.pdfbox.Loader;
@@ -50,32 +47,7 @@ public class DocumentServiceImpl implements DocumentService {
     private final DocumentPageRepository documentPageRepository;
     private final SpaceRepository spaceRepository;
     private final ChatMessageRepository chatMessageRepository;
-    private final ChatLanguageModel chatLanguageModel;
-
-    // Interface dùng cho LangChain4j AiServices để tự động hóa Prompt sinh Note & Flashcards
-    interface GeminiStudyHelper {
-        @SystemMessage("""
-            Bạn là một chuyên gia tóm tắt tài liệu và giảng dạy học thuật.
-            Nhiệm vụ của bạn là đọc nội dung tài liệu được cung cấp và sinh ra 2 phần:
-            1. Tóm tắt nội dung tài liệu (dưới dạng Markdown chi tiết, cấu trúc rõ ràng, sinh động, dễ học).
-            2. Một danh sách gồm khoảng 5-10 câu hỏi ôn tập (Flashcards) dưới dạng định dạng JSON chuẩn. Mỗi flashcard có cấu trúc: {"question": "câu hỏi...", "answer": "câu trả lời..."}
-            
-            Vì kết quả trả về cần được tách biệt rõ ràng để xử lý lập trình, bạn BẮT BUỘC phải trả về kết quả chính xác theo định dạng phân tách sau đây:
-            === BẮT ĐẦU TÓM TẮT ===
-            [Nội dung tóm tắt ở định dạng Markdown]
-            === KẾT THÚC TÓM TẮT ===
-            === BẮT ĐẦU FLASHCARDS ===
-            [Mảng JSON chứa các flashcards, ví dụ: [{"question": "Câu hỏi 1?", "answer": "Đáp án 1"}, {"question": "Câu hỏi 2?", "answer": "Đáp án 2"}]]
-            === KẾT THÚC FLASHCARDS ===
-            
-            Hãy đảm bảo bạn chỉ sử dụng thông tin trong tài liệu đã cung cấp.
-            """)
-        @UserMessage("""
-            Tài liệu:
-            {{context}}
-            """)
-        String generateStudyNotes(@V("context") String context);
-    }
+    private final AiServiceClient aiServiceClient;
 
 
     @Override
@@ -400,31 +372,16 @@ public class DocumentServiceImpl implements DocumentService {
         }
         String context = contextBuilder.toString();
 
-        GeminiStudyHelper helper = AiServices.builder(GeminiStudyHelper.class)
-                .chatLanguageModel(chatLanguageModel)
-                .build();
-
         try {
-            String rawOutput = helper.generateStudyNotes(context);
+            AiServiceClient.StudyNotesResponse response = aiServiceClient.generateStudyNotes(context);
 
-            // Phân tách tóm tắt và flashcard
-            String summary = "";
+            String summary = response.summary != null ? response.summary.trim() : "";
+            
+            // Serialize list of flashcards to JSON string matching original format
+            ObjectMapper objectMapper = new ObjectMapper();
             String flashcards = "[]";
-
-            int startSummaryIdx = rawOutput.indexOf("=== BẮT ĐẦU TÓM TẮT ===");
-            int endSummaryIdx = rawOutput.indexOf("=== KẾT THÚC TÓM TẮT ===");
-            int startFlashcardsIdx = rawOutput.indexOf("=== BẮT ĐẦU FLASHCARDS ===");
-            int endFlashcardsIdx = rawOutput.indexOf("=== KẾT THÚC FLASHCARDS ===");
-
-            if (startSummaryIdx != -1 && endSummaryIdx != -1) {
-                summary = rawOutput.substring(startSummaryIdx + "=== BẮT ĐẦU TÓM TẮT ===".length(), endSummaryIdx).trim();
-            } else {
-                // Fallback nếu model không tuân thủ hoàn toàn định dạng phân tách
-                summary = rawOutput;
-            }
-
-            if (startFlashcardsIdx != -1 && endFlashcardsIdx != -1) {
-                flashcards = rawOutput.substring(startFlashcardsIdx + "=== BẮT ĐẦU FLASHCARDS ===".length(), endFlashcardsIdx).trim();
+            if (response.flashcards != null) {
+                flashcards = objectMapper.writeValueAsString(response.flashcards);
             }
 
             document.setSummary(summary);
@@ -432,7 +389,7 @@ public class DocumentServiceImpl implements DocumentService {
             documentRepository.save(document);
 
         } catch (Exception e) {
-            log.error("Failed to generate study notes using Gemini API", e);
+            log.error("Failed to generate study notes using Python AI service", e);
             throw new RuntimeException("Lỗi sinh tóm tắt hoặc flashcard bằng AI: " + e.getMessage(), e);
         }
 
