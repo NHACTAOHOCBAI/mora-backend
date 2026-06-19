@@ -2,7 +2,7 @@
 
 Mora Backend là dịch vụ máy chủ được phát triển trên nền tảng **Java Spring Boot**, đóng vai trò xử lý logic nghiệp vụ, quản lý cơ sở dữ liệu và tích hợp lưu trữ đám mây cho dự án **Mora - AI-Powered Social Learning Network** (Mạng xã hội học tập nhóm tích hợp AI thế hệ mới với cơ chế Source-Grounded AI tương tự NotebookLM).
 
-Dự án hiện tại hỗ trợ các tính năng cốt lõi cho **Giai đoạn 1**: Pipeline xử lý tài liệu, bóc tách nội dung PDF theo trang, tích hợp hệ thống lưu trữ Cloud Storage (Supabase), cơ sở dữ liệu PostgreSQL, và tích hợp mô hình AI Gemini qua LangChain4j hỗ trợ hỏi đáp kèm định vị nguồn trích dẫn và lưu trữ lịch sử cuộc trò chuyện.
+Dự án hiện tại hỗ trợ các tính năng cốt lõi cho **Giai đoạn 1**: Pipeline xử lý tài liệu, bóc tách nội dung PDF theo trang, tích hợp hệ thống lưu trữ Cloud Storage (Supabase), cơ sở dữ liệu PostgreSQL, và kết nối tích hợp mô hình AI Gemini thông qua Python microservice `mora-ai` hỗ trợ hỏi đáp kèm định vị nguồn trích dẫn và lưu trữ lịch sử cuộc trò chuyện.
 
 ---
 
@@ -14,7 +14,7 @@ Dự án hiện tại hỗ trợ các tính năng cốt lõi cho **Giai đoạn 
 *   **PostgreSQL 16** - Hệ quản trị cơ sở dữ liệu quan hệ chính.
 *   **Supabase Storage** - Giải pháp lưu trữ Cloud Object Storage quản lý tệp tin tài liệu gốc.
 *   **Apache PDFBox 3.0.3** - Thư viện bóc tách và phân tích dữ liệu văn bản từ file PDF theo trang.
-*   **LangChain4j 0.31.0** - Thư viện tích hợp LLM chính, kết nối với Google Gemini API, hỗ trợ AI Services, System/User Prompts và Structured Outputs (JSON Schema).
+*   **RestTemplate** - HTTP Client trong Spring Boot dùng để kết nối với Python AI Service (`mora-ai`).
 *   **Lombok** - Tự sinh code Boilerplate (Constructor, Getter/Setter, Builder, Logging).
 *   **Springdoc OpenAPI v2.8.5** - Tự động sinh tài liệu API (Swagger UI).
 
@@ -26,7 +26,8 @@ Dự án tuân thủ mô hình **Package-by-Layer** kết hợp phân tách logi
 
 ```text
 com.mora.backend
-├── config/             # Cấu hình Spring Boot (CORS, OpenApi, Jackson, JPA, Gemini...)
+├── client/             # Các Client gọi dịch vụ ngoài (AiServiceClient kết nối tới mora-ai)
+├── config/             # Cấu hình Spring Boot (CORS, OpenApi, Jackson, JPA...)
 ├── controller/         # REST API Controllers (Nhận/trả dữ liệu và điều hướng, không xử lý logic)
 ├── exception/          # Quản lý và xử lý lỗi tập trung toàn cục (Global Exception Handler)
 ├── model/              # Quản lý cấu trúc dữ liệu
@@ -52,14 +53,14 @@ com.mora.backend
     *   Tải tài liệu gốc định dạng PDF lên Supabase Cloud Storage.
     *   Sử dụng **Apache PDFBox** để bóc tách nội dung văn bản (text extraction) độc lập theo từng trang (Page-by-page mapping).
     *   Lưu thông tin metadata của tài liệu và nội dung chi tiết từng trang vào PostgreSQL.
-2.  **Tích hợp AI Engine (Gemini & LangChain4j):**
-    *   **Hỏi đáp Source-Grounded (RAG):** Trả lời câu hỏi của người dùng dựa trên ngữ cảnh tài liệu (độc lập hoặc toàn bộ Space).
-    *   **Trích dẫn trang (Citations):** Ép đầu ra cấu trúc để Gemini trả về danh sách trích dẫn (quote gốc trong file PDF, số trang, mã tài liệu).
-    *   **Rút gọn câu hỏi (Condense Question):** Tự động gom lịch sử trò chuyện trong DB và câu hỏi mới của người dùng thành một câu độc lập trước khi gửi cho LLM.
-    *   **Đọc hiểu hình ảnh (Multimodal Vision Engine):** Tự động phát hiện nhạy bén các trang tài liệu PDF chứa hình vẽ, sơ đồ vector hoặc ảnh (`getXObjectNames().iterator().hasNext()`), tự động kết xuất sang ảnh ảo JPEG tối ưu hóa kích thước và gửi kèm dưới dạng dữ liệu Multimodal (Base64) lên Gemini.
-    *   **Trình gỡ lỗi Prompt (Prompt Debugger):** Lưu vết toàn bộ nội dung prompt chính xác gửi đi vào cơ sở dữ liệu (`prompt_sent`). Hỗ trợ người dùng nhấp đúp (Double-click) vào bong bóng tin nhắn AI trên giao diện React để hiển thị chi tiết prompt gốc trong hộp thoại Shadcn UI Dialog.
-    *   **Công cụ học tập thông minh (Study Helper):** Tự động tạo bản Tóm tắt (Summary) học thuật và bộ câu hỏi ôn tập (Flashcards) dưới dạng JSON từ tài liệu.
-    *   **Xử lý lưu trữ bền bỉ (Robust Delete):** Cơ chế xóa file thông minh, tự động bỏ qua lỗi và ghi nhận cảnh báo nếu file không còn trên Supabase Storage nhằm đảm bảo tài liệu và dữ liệu liên quan luôn được dọn dẹp sạch sẽ trong cơ sở dữ liệu PostgreSQL.
+2.  **Tích hợp AI Engine (Python microservice `mora-ai` & Gemini SDK):**
+    *   **Hỏi đáp Source-Grounded (RAG):** Gửi yêu cầu qua `AiServiceClient` sang Python Server để hỏi đáp dựa trên ngữ cảnh tài liệu (độc lập hoặc toàn bộ Space).
+    *   **Trích dẫn trang (Citations):** Gemini trả về danh sách trích dẫn (quote gốc trong file PDF, số trang, mã tài liệu) qua cấu trúc JSON chuẩn.
+    *   **Rút gọn câu hỏi (Condense Question):** Tự động gom lịch sử trò chuyện và câu hỏi mới thành một câu độc lập trên Python Server trước khi gửi cho LLM.
+    *   **Đọc hiểu hình ảnh (Multimodal Vision Engine):** Tự động phát hiện các trang PDF chứa ảnh/sơ đồ vector, kết xuất thành ảnh ảo JPEG rồi gửi dữ liệu Base64 qua Python Server để Gemini xử lý dạng binary/inlineData.
+    *   **Trình gỡ lỗi Prompt (Prompt Debugger):** Lưu vết toàn bộ nội dung prompt chính xác gửi đi vào cơ sở dữ liệu (`prompt_sent`). Hỗ trợ hiển thị trực quan prompt gốc kèm hình ảnh trong hộp thoại trên Frontend.
+    *   **Công cụ học tập thông minh (Study Helper):** Tạo bản Tóm tắt (Summary) học thuật và bộ flashcards thông qua Python AI Service.
+    *   **Xử lý lưu trữ bền bỉ (Robust Delete):** Cơ chế xóa file thông minh, tự động dọn dẹp sạch sẽ tài liệu và các trang liên quan trong cơ sở dữ liệu.
 3.  **Lưu trữ Lịch sử Trò chuyện:**
     *   Tự động lưu lại các tin nhắn trao đổi (User & Assistant) vào DB PostgreSQL.
     *   Cung cấp các API REST để lấy lịch sử cuộc trò chuyện và dọn dẹp (xóa) lịch sử trò chuyện của từng tài liệu/Space.

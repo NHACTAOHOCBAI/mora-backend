@@ -76,9 +76,9 @@ Nhằm nâng cao tính học thuật và giá trị thực tiễn của đồ á
      - Khi cần đọc hiểu nội dung trang PDF chứa ảnh, hệ thống gọi dịch vụ tải PDF từ bộ nhớ đệm (Local Cache) để tránh tải lại nhiều lần từ Supabase.
      - Sử dụng PDFRenderer.renderImageWithDPI(pageIndex, 150) để chuyển trang PDF thành một đối tượng BufferedImage với độ phân giải 150 DPI.
      - Nén và tối ưu hóa ảnh thông qua ImageUtil.resizeAndCompress (giới hạn kích thước tối đa 1024px và chất lượng nén JPG 80%) để thu được luồng dữ liệu byte ảnh tối ưu hóa nhất trước khi chuyển sang Base64 gửi lên Gemini.
-   - *Tích hợp LLM qua LangChain4j:*
-     - Khai báo phương thức chat của AI Service nhận danh sách đối tượng Image từ LangChain4j, được chú thích rõ ràng bằng @V("image") hoặc @V("images") để tránh lỗi ánh xạ tham số đa phương thức của Gemini.
-     - Dữ liệu hình ảnh được chuyển đổi sang Base64 JPEG và đóng gói trực tiếp vào payload request gửi đi cùng với chuỗi ngữ cảnh văn bản.
+    - *Tích hợp kết nối qua Python AI Microservice (mora-ai):*
+      - Thay vì gọi trực tiếp LangChain4j ở Java, Spring Boot gửi dữ liệu hình ảnh (Base64 JPEG) và văn bản ngữ cảnh qua HTTP Client (RestTemplate) sang Python Server.
+      - Python Server (`mora-ai`) tiếp nhận, chuyển đổi Base64 thành dữ liệu nhị phân (`inlineData`) thông qua `types.Part.from_bytes` và truyền cho Google GenAI SDK để gọi Gemini API xử lý chính xác và tối ưu.
    - *Các API Gỡ lỗi & Trích xuất Tài nguyên mới:*
      - **API Debug Ảnh (GET /api/documents/{id}/debug-images):** Trả về danh sách chi tiết tất cả các đối tượng đồ họa được phát hiện trên từng trang PDF kèm các thông tin như tên XObject, kích thước, định dạng, trạng thái được chấp nhận (accepted) và lý do từ chối cụ thể (filterReason - ví dụ: "Trùng lặp ở Tầng 2 (xuất hiện X lần)", "Kích thước quá nhỏ...").
      - **API Trích xuất Ảnh gốc (GET /api/documents/{id}/pages/{pageNumber}/images/{imageName}):** Cho phép kết xuất động và tải xuống trực tiếp file ảnh gốc dưới định dạng PNG từ tài nguyên trang PDF, hỗ trợ việc hiển thị trực quan dữ liệu debug trên giao diện Frontend.
