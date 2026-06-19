@@ -12,6 +12,7 @@ import com.mora.backend.model.entity.Space;
 import com.mora.backend.repository.SpaceRepository;
 import com.mora.backend.repository.DocumentPageRepository;
 import com.mora.backend.repository.DocumentRepository;
+import com.mora.backend.repository.ChatMessageRepository;
 import com.mora.backend.service.DocumentService;
 import com.mora.backend.service.StorageService;
 import dev.langchain4j.model.chat.ChatLanguageModel;
@@ -47,6 +48,7 @@ public class DocumentServiceImpl implements DocumentService {
     private final DocumentRepository documentRepository;
     private final DocumentPageRepository documentPageRepository;
     private final SpaceRepository spaceRepository;
+    private final ChatMessageRepository chatMessageRepository;
     private final ChatLanguageModel chatLanguageModel;
 
     // Interface dùng cho LangChain4j AiServices để tự động hóa Prompt sinh Note & Flashcards
@@ -358,7 +360,10 @@ public class DocumentServiceImpl implements DocumentService {
             log.error("Failed to delete file '{}' from Supabase storage during document deletion", fileName, e);
         }
 
-        // 2. Delete document from database (cascade deletes all related pages)
+        // 2. Delete associated chat messages
+        chatMessageRepository.deleteByDocumentId(id);
+
+        // 3. Delete document from database (cascade deletes all related pages)
         documentRepository.delete(document);
     }
 

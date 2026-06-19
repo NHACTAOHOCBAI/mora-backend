@@ -9,7 +9,9 @@ import com.mora.backend.model.dto.response.SpaceResponse;
 import com.mora.backend.model.entity.Space;
 import com.mora.backend.model.entity.DocumentPage;
 import com.mora.backend.repository.SpaceRepository;
+import com.mora.backend.repository.ChatMessageRepository;
 import com.mora.backend.service.SpaceService;
+import com.mora.backend.service.DocumentService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -23,6 +25,8 @@ import java.util.List;
 public class SpaceServiceImpl implements SpaceService {
 
     private final SpaceRepository spaceRepository;
+    private final DocumentService documentService;
+    private final ChatMessageRepository chatMessageRepository;
 
     @Override
     @Transactional
@@ -89,6 +93,18 @@ public class SpaceServiceImpl implements SpaceService {
                     return new AppException(ErrorCode.SPACE_NOT_FOUND);
                 });
 
+        // 1. Delete all documents in this space (this deletes physical files on Supabase storage and associated chat messages/pages)
+        List<Long> documentIds = space.getDocuments().stream()
+                .map(com.mora.backend.model.entity.Document::getId)
+                .toList();
+        for (Long docId : documentIds) {
+            documentService.deleteDocument(docId);
+        }
+
+        // 2. Delete space-level chat messages (where document is null)
+        chatMessageRepository.deleteBySpaceIdAndDocumentIsNull(id);
+
+        // 3. Delete the space itself
         spaceRepository.delete(space);
     }
 
