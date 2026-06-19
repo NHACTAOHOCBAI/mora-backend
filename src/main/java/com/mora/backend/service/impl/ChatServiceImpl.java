@@ -51,9 +51,9 @@ public class ChatServiceImpl implements ChatService {
     interface GeminiAssistant {
         @SystemMessage("""
             Bạn là một trợ lý học thuật nghiêm khắc.
-            Hãy trả lời câu hỏi của người dùng CHỈ sử dụng thông tin từ ngữ cảnh tài liệu được cung cấp dưới đây.
-            Nếu ngữ cảnh chứa hình ảnh, hãy phân tích kỹ hình ảnh đó để hỗ trợ trả lời.
-            Nếu thông tin trong tài liệu không đủ hoặc câu hỏi nằm ngoài phạm vi tài liệu, bạn bắt buộc phải trả lời 'false' cho trường 'answerFound', không được tự ý đoán mò, và đặt 'answer' thành câu từ chối trả lời phù hợp (Ví dụ: "Tôi không tìm thấy thông tin này trong tài liệu.").
+            Hãy trả lời câu hỏi của người dùng CHỈ sử dụng thông tin từ ngữ cảnh tài liệu được cung cấp dưới đây (bao gồm cả nội dung văn bản và hình ảnh của tài liệu đó).
+            Nếu tài liệu có hình ảnh đính kèm (hoặc bản thân tài liệu là hình ảnh), hãy phân tích kỹ hình ảnh và bạn ĐƯỢC PHÉP suy luận logic dựa trên hình ảnh để trả lời câu hỏi của người dùng.
+            Nếu thông tin trong tài liệu (cả phần chữ và phần hình ảnh) không đủ hoặc câu hỏi nằm ngoài phạm vi tài liệu, bạn bắt buộc phải trả lời 'false' cho trường 'answerFound', không được tự ý đoán mò, và đặt 'answer' thành câu từ chối trả lời phù hợp (Ví dụ: "Tôi không tìm thấy thông tin này trong tài liệu.").
             """)
         @UserMessage("""
             Ngữ cảnh tài liệu:
@@ -65,15 +65,17 @@ public class ChatServiceImpl implements ChatService {
 
         @SystemMessage("""
             Bạn là một trợ lý học thuật nghiêm khắc.
-            Hãy trả lời câu hỏi của người dùng CHỈ sử dụng thông tin từ ngữ cảnh tài liệu được cung cấp dưới đây.
-            Nếu ngữ cảnh chứa hình ảnh, hãy phân tích kỹ hình ảnh đó để hỗ trợ trả lời.
-            Nếu thông tin trong tài liệu không đủ hoặc câu hỏi nằm ngoài phạm vi tài liệu, bạn bắt buộc phải trả lời 'false' cho trường 'answerFound', không được tự ý đoán mò, và đặt 'answer' thành câu từ chối trả lời phù hợp (Ví dụ: "Tôi không tìm thấy thông tin này trong tài liệu.").
+            Hãy trả lời câu hỏi của người dùng CHỈ sử dụng thông tin từ ngữ cảnh tài liệu được cung cấp dưới đây (bao gồm cả nội dung văn bản và hình ảnh của tài liệu đó).
+            Nếu tài liệu có hình ảnh đính kèm (hoặc bản thân tài liệu là hình ảnh), hãy phân tích kỹ hình ảnh và bạn ĐƯỢC PHÉP suy luận logic dựa trên hình ảnh để trả lời câu hỏi của người dùng.
+            Nếu thông tin trong tài liệu (cả phần chữ và phần hình ảnh) không đủ hoặc câu hỏi nằm ngoài phạm vi tài liệu, bạn bắt buộc phải trả lời 'false' cho trường 'answerFound', không được tự ý đoán mò, và đặt 'answer' thành câu từ chối trả lời phù hợp (Ví dụ: "Tôi không tìm thấy thông tin này trong tài liệu.").
             """)
         @UserMessage("""
             Ngữ cảnh tài liệu:
             {{context}}
             
             Câu hỏi: {{question}}
+            
+            {{image}}
             """)
         DocumentChatResponse chatWithImage(@V("context") String context, @V("question") String question, @V("image") dev.langchain4j.data.image.Image image);
     }
@@ -81,10 +83,10 @@ public class ChatServiceImpl implements ChatService {
     interface SpaceAssistant {
         @SystemMessage("""
             Bạn là một trợ lý học thuật nghiêm khắc.
-            Hãy trả lời câu hỏi của người dùng CHỈ sử dụng thông tin từ ngữ cảnh tài liệu được cung cấp dưới đây.
+            Hãy trả lời câu hỏi của người dùng CHỈ sử dụng thông tin từ ngữ cảnh tài liệu được cung cấp dưới đây (bao gồm cả nội dung văn bản và hình ảnh của tài liệu đó).
             Ngữ cảnh chứa nhiều tài liệu khác nhau. Mỗi tài liệu được phân tách bằng '--- BẮT ĐẦU FILE: ID [id_cua_file], TÊN [tên file] ---' và '--- KẾT THÚC FILE...'.
-            Nếu ngữ cảnh chứa hình ảnh, hãy phân tích kỹ hình ảnh đó để hỗ trợ trả lời.
-            Nếu thông tin trong các tài liệu không đủ hoặc câu hỏi nằm ngoài phạm vi tài liệu, bạn bắt buộc phải trả lời 'false' cho trường 'answerFound', không được tự ý đoán mò, và đặt 'answer' thành câu từ chối trả lời phù hợp (Ví dụ: "Tôi không tìm thấy thông tin này trong các tài liệu của không gian học tập.").
+            Nếu tài liệu có hình ảnh đính kèm (hoặc bản thân tài liệu là hình ảnh), hãy phân tích kỹ hình ảnh và bạn ĐƯỢC PHÉP suy luận logic dựa trên hình ảnh để trả lời câu hỏi của người dùng.
+            Nếu thông tin trong các tài liệu (cả phần chữ và phần hình ảnh) không đủ hoặc câu hỏi nằm ngoài phạm vi tài liệu, bạn bắt buộc phải trả lời 'false' cho trường 'answerFound', không được tự ý đoán mò, và đặt 'answer' thành câu từ chối trả lời phù hợp (Ví dụ: "Tôi không tìm thấy thông tin này trong các tài liệu của không gian học tập.").
             Trong mảng trích dẫn (citations), với mỗi trích dẫn bạn phải cung cấp chính xác 'documentId' (lấy từ ID [id_cua_file] trong tiêu đề file tương ứng) và 'pageNumber' của trang chứa câu trích dẫn đó.
             """)
         @UserMessage("""
@@ -97,10 +99,10 @@ public class ChatServiceImpl implements ChatService {
 
         @SystemMessage("""
             Bạn là một trợ lý học thuật nghiêm khắc.
-            Hãy trả lời câu hỏi của người dùng CHỈ sử dụng thông tin từ ngữ cảnh tài liệu được cung cấp dưới đây.
+            Hãy trả lời câu hỏi của người dùng CHỈ sử dụng thông tin từ ngữ cảnh tài liệu được cung cấp dưới đây (bao gồm cả nội dung văn bản và hình ảnh của tài liệu đó).
             Ngữ cảnh chứa nhiều tài liệu khác nhau. Mỗi tài liệu được phân tách bằng '--- BẮT ĐẦU FILE: ID [id_cua_file], TÊN [tên file] ---' và '--- KẾT THÚC FILE...'.
-            Nếu ngữ cảnh chứa hình ảnh, hãy phân tích kỹ hình ảnh đó để hỗ trợ trả lời.
-            Nếu thông tin trong các tài liệu không đủ hoặc câu hỏi nằm ngoài phạm vi tài liệu, bạn bắt buộc phải trả lời 'false' cho trường 'answerFound', không được tự ý đoán mò, và đặt 'answer' thành câu từ chối trả lời phù hợp (Ví dụ: "Tôi không tìm thấy thông tin này trong các tài liệu của không gian học tập.").
+            Nếu tài liệu có hình ảnh đính kèm (hoặc bản thân tài liệu là hình ảnh), hãy phân tích kỹ hình ảnh và bạn ĐƯỢC PHÉP suy luận logic dựa trên hình ảnh để trả lời câu hỏi của người dùng.
+            Nếu thông tin trong các tài liệu (cả phần chữ và phần hình ảnh) không đủ hoặc câu hỏi nằm ngoài phạm vi tài liệu, bạn bắt buộc phải trả lời 'false' cho trường 'answerFound', không được tự ý đoán mò, và đặt 'answer' thành câu từ chối trả lời phù hợp (Ví dụ: "Tôi không tìm thấy thông tin này trong các tài liệu của không gian học tập.").
             Trong mảng trích dẫn (citations), với mỗi trích dẫn bạn phải cung cấp chính xác 'documentId' (lấy từ ID [id_cua_file] trong tiêu đề file tương ứng) và 'pageNumber' của trang chứa câu trích dẫn đó.
             """)
         @UserMessage("""
@@ -108,6 +110,8 @@ public class ChatServiceImpl implements ChatService {
             {{context}}
             
             Câu hỏi: {{question}}
+            
+            {{images}}
             """)
         SpaceChatResponse chatWithImages(@V("context") String context, @V("question") String question, @V("images") List<dev.langchain4j.data.image.Image> images);
     }
@@ -187,38 +191,19 @@ public class ChatServiceImpl implements ChatService {
                 .build();
         chatMessageRepository.save(userMessage);
 
-        // 3. Định dạng ngữ cảnh đầu vào (Context Formatting) theo Bước 2 trong PHASE_1.md
-        StringBuilder contextBuilder = new StringBuilder();
-        contextBuilder.append("--- BẮT ĐẦU FILE: ").append(document.getFileName()).append(" ---\n");
-        for (DocumentPage page : pages) {
-            contextBuilder.append("--- TRANG ").append(page.getPageNumber()).append(" ---\n");
-            contextBuilder.append(page.getContent()).append("\n\n");
-        }
-        contextBuilder.append("--- KẾT THÚC FILE: ").append(document.getFileName()).append(" ---");
-        String context = contextBuilder.toString();
-
-        // 4. Rút gọn câu hỏi dựa trên lịch sử lưu trong DB
-        List<ChatMessage> dbHistory = chatMessageRepository.findByDocumentIdOrderByCreatedAtAsc(request.getDocumentId());
-        List<ChatMessageDto> historyDtoList = dbHistory.stream()
-                .filter(m -> !m.getId().equals(userMessage.getId())) // loại bỏ tin nhắn vừa lưu
-                .map(msg -> ChatMessageDto.builder()
-                        .sender(msg.getSender())
-                        .text(msg.getText())
-                        .build())
-                .toList();
-
-        String condensedQuestion = getCondensedQuestion(historyDtoList, request.getQuestion());
-
-        // 5. Kiểm tra và chuẩn bị ảnh để gửi kèm nếu có trang chứa hình ảnh
+        // 3. Kiểm tra và chuẩn bị ảnh để gửi kèm nếu có trang chứa hình ảnh (Đưa lên trước để đưa vào debugContext)
         dev.langchain4j.data.image.Image imageToSend = null;
+        String base64Image = null;
+        DocumentPage pageWithImage = null;
         boolean isPdf = "pdf".equalsIgnoreCase(document.getFileType());
 
         if (!isPdf) {
             try {
                 byte[] imageBytes = documentService.renderPageImage(document.getId(), 1);
                 if (imageBytes != null && imageBytes.length > 0) {
+                    base64Image = Base64.getEncoder().encodeToString(imageBytes);
                     imageToSend = dev.langchain4j.data.image.Image.builder()
-                            .base64Data(Base64.getEncoder().encodeToString(imageBytes))
+                            .base64Data(base64Image)
                             .mimeType("image/jpeg")
                             .build();
                 }
@@ -227,7 +212,6 @@ public class ChatServiceImpl implements ChatService {
             }
         } else {
             int targetPage = extractPageNumber(request.getQuestion());
-            DocumentPage pageWithImage = null;
             
             if (targetPage > 0) {
                 for (DocumentPage page : pages) {
@@ -251,8 +235,9 @@ public class ChatServiceImpl implements ChatService {
                 try {
                     byte[] imageBytes = documentService.renderPageImage(document.getId(), pageWithImage.getPageNumber());
                     if (imageBytes != null && imageBytes.length > 0) {
+                        base64Image = Base64.getEncoder().encodeToString(imageBytes);
                         imageToSend = dev.langchain4j.data.image.Image.builder()
-                                .base64Data(Base64.getEncoder().encodeToString(imageBytes))
+                                .base64Data(base64Image)
                                 .mimeType("image/jpeg")
                                 .build();
                         log.info("Đã tự động gửi kèm ảnh của trang {} để trợ giúp hỏi đáp", pageWithImage.getPageNumber());
@@ -263,6 +248,43 @@ public class ChatServiceImpl implements ChatService {
             }
         }
 
+        // 4. Định dạng ngữ cảnh đầu vào (Context Formatting) theo Bước 2 trong PHASE_1.md
+        StringBuilder contextBuilder = new StringBuilder();
+        StringBuilder debugContextBuilder = new StringBuilder();
+        
+        contextBuilder.append("--- BẮT ĐẦU FILE: ").append(document.getFileName()).append(" ---\n");
+        debugContextBuilder.append("--- BẮT ĐẦU FILE: ").append(document.getFileName()).append(" ---\n");
+        
+        for (DocumentPage page : pages) {
+            contextBuilder.append("--- TRANG ").append(page.getPageNumber()).append(" ---\n");
+            contextBuilder.append(page.getContent()).append("\n\n");
+            
+            debugContextBuilder.append("--- TRANG ").append(page.getPageNumber()).append(" ---\n");
+            // Nếu trang này chứa ảnh được chọn gửi, chèn thẻ img ngay sau tiêu đề trang trong debugContext
+            if (base64Image != null && ((!isPdf && page.getPageNumber() == 1) || (pageWithImage != null && page.getPageNumber() == pageWithImage.getPageNumber()))) {
+                debugContextBuilder.append(String.format("<img src=\"data:image/jpeg;base64,%s\" />\n\n", base64Image));
+            }
+            debugContextBuilder.append(page.getContent()).append("\n\n");
+        }
+        
+        contextBuilder.append("--- KẾT THÚC FILE: ").append(document.getFileName()).append(" ---");
+        debugContextBuilder.append("--- KẾT THÚC FILE: ").append(document.getFileName()).append(" ---");
+        
+        String context = contextBuilder.toString();
+        String debugContext = debugContextBuilder.toString();
+
+        // 5. Rút gọn câu hỏi dựa trên lịch sử lưu trong DB
+        List<ChatMessage> dbHistory = chatMessageRepository.findByDocumentIdOrderByCreatedAtAsc(request.getDocumentId());
+        List<ChatMessageDto> historyDtoList = dbHistory.stream()
+                .filter(m -> !m.getId().equals(userMessage.getId())) // loại bỏ tin nhắn vừa lưu
+                .map(msg -> ChatMessageDto.builder()
+                        .sender(msg.getSender())
+                        .text(msg.getText())
+                        .build())
+                .toList();
+
+        String condensedQuestion = getCondensedQuestion(historyDtoList, request.getQuestion());
+
         // 6. Tạo AI Assistant thông qua LangChain4j AiServices
         GeminiAssistant assistant = AiServices.builder(GeminiAssistant.class)
                 .chatLanguageModel(chatLanguageModel)
@@ -271,22 +293,34 @@ public class ChatServiceImpl implements ChatService {
         String fullPrompt = String.format("""
                 [SYSTEM PROMPT]
                 Bạn là một trợ lý học thuật nghiêm khắc.
-                Hãy trả lời câu hỏi của người dùng CHỈ sử dụng thông tin từ ngữ cảnh tài liệu được cung cấp dưới đây.
-                Nếu ngữ cảnh chứa hình ảnh, hãy phân tích kỹ hình ảnh đó để hỗ trợ trả lời.
-                Nếu thông tin trong tài liệu không đủ hoặc câu hỏi nằm ngoài phạm vi tài liệu, bạn bắt buộc phải trả lời 'false' cho trường 'answerFound', không được tự ý đoán mò, và đặt 'answer' thành câu từ chối trả lời phù hợp (Ví dụ: "Tôi không tìm thấy thông tin này trong tài liệu.").
+                Hãy trả lời câu hỏi của người dùng CHỈ sử dụng thông tin từ ngữ cảnh tài liệu được cung cấp dưới đây (bao gồm cả nội dung văn bản và hình ảnh của tài liệu đó).
+                Nếu tài liệu có hình ảnh đính kèm (hoặc bản thân tài liệu là hình ảnh), hãy phân tích kỹ hình ảnh và bạn ĐƯỢC PHÉP suy luận logic dựa trên hình ảnh để trả lời câu hỏi của người dùng.
+                Nếu thông tin trong tài liệu (cả phần chữ và phần hình ảnh) không đủ hoặc câu hỏi nằm ngoài phạm vi tài liệu, bạn bắt buộc phải trả lời 'false' cho trường 'answerFound', không được tự ý đoán mò, và đặt 'answer' thành câu từ chối trả lời phù hợp (Ví dụ: "Tôi không tìm thấy thông tin này trong tài liệu.").
                 
                 [USER MESSAGE]
                 Ngữ cảnh tài liệu:
                 %s
                 
-                Câu hỏi: %s""", context, condensedQuestion);
+                Câu hỏi: %s""", debugContext, condensedQuestion);
 
         // 7. Gọi Gemini và nhận kết quả cấu trúc
         try {
             DocumentChatResponse response;
             if (imageToSend != null) {
+                logGeminiRequest(
+                        "Bạn là một trợ lý học thuật nghiêm khắc.\nHãy trả lời câu hỏi của người dùng CHỈ sử dụng thông tin từ ngữ cảnh tài liệu được cung cấp dưới đây (bao gồm cả nội dung văn bản và hình ảnh của tài liệu đó).\nNếu tài liệu có hình ảnh đính kèm (hoặc bản thân tài liệu là hình ảnh), hãy phân tích kỹ hình ảnh và bạn ĐƯỢC PHÉP suy luận logic dựa trên hình ảnh để trả lời câu hỏi của người dùng.\nNếu thông tin trong tài liệu (cả phần chữ và phần hình ảnh) không đủ hoặc câu hỏi nằm ngoài phạm vi tài liệu, bạn bắt buộc phải trả lời 'false' cho trường 'answerFound', không được tự ý đoán mò, và đặt 'answer' thành câu từ chối trả lời phù hợp (Ví dụ: \"Tôi không tìm thấy thông tin này trong tài liệu.\").",
+                        context,
+                        condensedQuestion,
+                        List.of(base64Image)
+                );
                 response = assistant.chatWithImage(context, condensedQuestion, imageToSend);
             } else {
+                logGeminiRequest(
+                        "Bạn là một trợ lý học thuật nghiêm khắc.\nHãy trả lời câu hỏi của người dùng CHỈ sử dụng thông tin từ ngữ cảnh tài liệu được cung cấp dưới đây (bao gồm cả nội dung văn bản và hình ảnh của tài liệu đó).\nNếu tài liệu có hình ảnh đính kèm (hoặc bản thân tài liệu là hình ảnh), hãy phân tích kỹ hình ảnh và bạn ĐƯỢC PHÉP suy luận logic dựa trên hình ảnh để trả lời câu hỏi của người dùng.\nNếu thông tin trong tài liệu (cả phần chữ và phần hình ảnh) không đủ hoặc câu hỏi nằm ngoài phạm vi tài liệu, bạn bắt buộc phải trả lời 'false' cho trường 'answerFound', không được tự ý đoán mò, và đặt 'answer' thành câu từ chối trả lời phù hợp (Ví dụ: \"Tôi không tìm thấy thông tin này trong tài liệu.\").",
+                        context,
+                        condensedQuestion,
+                        null
+                );
                 response = assistant.chat(context, condensedQuestion);
             }
             
@@ -371,52 +405,27 @@ public class ChatServiceImpl implements ChatService {
                 .build();
         chatMessageRepository.save(userMessage);
 
-        // 3. Định dạng siêu ngữ cảnh đầu vào (Multi-Document Context Formatting)
-        StringBuilder contextBuilder = new StringBuilder();
-        Long currentDocId = null;
-        for (DocumentPage page : pages) {
-            Document doc = page.getDocument();
-            if (currentDocId == null || !currentDocId.equals(doc.getId())) {
-                if (currentDocId != null) {
-                    contextBuilder.append("--- KẾT THÚC FILE: ID [").append(currentDocId).append("] ---\n\n");
-                }
-                currentDocId = doc.getId();
-                contextBuilder.append("--- BẮT ĐẦU FILE: ID [").append(currentDocId)
-                        .append("], TÊN [").append(doc.getFileName()).append("] ---\n");
-            }
-            contextBuilder.append("--- TRANG ").append(page.getPageNumber()).append(" ---\n");
-            contextBuilder.append(page.getContent()).append("\n\n");
-        }
-        if (currentDocId != null) {
-            contextBuilder.append("--- KẾT THÚC FILE: ID [").append(currentDocId).append("] ---");
-        }
-        String context = contextBuilder.toString();
-
-        // 4. Rút gọn câu hỏi dựa trên lịch sử lưu trong DB
-        List<ChatMessage> dbHistory = chatMessageRepository.findBySpaceIdAndDocumentIsNullOrderByCreatedAtAsc(request.getSpaceId());
-        List<ChatMessageDto> historyDtoList = dbHistory.stream()
-                .filter(m -> !m.getId().equals(userMessage.getId())) // loại bỏ tin nhắn vừa lưu
-                .map(msg -> ChatMessageDto.builder()
-                        .sender(msg.getSender())
-                        .text(msg.getText())
-                        .build())
-                .toList();
-
-        String condensedQuestion = getCondensedQuestion(historyDtoList, request.getQuestion());
-
-        // 5. Kiểm tra và chuẩn bị ảnh từ các trang chứa hình ảnh (tối đa 3 ảnh)
+        // 3. Kiểm tra và chuẩn bị ảnh từ các trang chứa hình ảnh (tối đa 3 ảnh) (Đưa lên trước để đưa vào debugContext)
         List<dev.langchain4j.data.image.Image> imagesToSend = new ArrayList<>();
+        List<String> base64Images = new ArrayList<>();
+        java.util.Map<String, String> pageImageMap = new java.util.HashMap<>();
         int imageCount = 0;
         for (DocumentPage page : pages) {
             if (Boolean.TRUE.equals(page.getHasImage())) {
                 try {
                     byte[] imageBytes = documentService.renderPageImage(page.getDocument().getId(), page.getPageNumber());
                     if (imageBytes != null && imageBytes.length > 0) {
+                        String base64Str = Base64.getEncoder().encodeToString(imageBytes);
                         dev.langchain4j.data.image.Image imgObj = dev.langchain4j.data.image.Image.builder()
-                                .base64Data(Base64.getEncoder().encodeToString(imageBytes))
+                                .base64Data(base64Str)
                                 .mimeType("image/jpeg")
                                 .build();
                         imagesToSend.add(imgObj);
+                        base64Images.add(base64Str);
+                        
+                        String key = page.getDocument().getId() + "_" + page.getPageNumber();
+                        pageImageMap.put(key, base64Str);
+                        
                         imageCount++;
                         if (imageCount >= 3) {
                             break;
@@ -428,6 +437,53 @@ public class ChatServiceImpl implements ChatService {
             }
         }
 
+        // 4. Định dạng siêu ngữ cảnh đầu vào (Multi-Document Context Formatting)
+        StringBuilder contextBuilder = new StringBuilder();
+        StringBuilder debugContextBuilder = new StringBuilder();
+        Long currentDocId = null;
+        for (DocumentPage page : pages) {
+            Document doc = page.getDocument();
+            if (currentDocId == null || !currentDocId.equals(doc.getId())) {
+                if (currentDocId != null) {
+                    contextBuilder.append("--- KẾT THÚC FILE: ID [").append(currentDocId).append("] ---\n\n");
+                    debugContextBuilder.append("--- KẾT THÚC FILE: ID [").append(currentDocId).append("] ---\n\n");
+                }
+                currentDocId = doc.getId();
+                contextBuilder.append("--- BẮT ĐẦU FILE: ID [").append(currentDocId)
+                        .append("], TÊN [").append(doc.getFileName()).append("] ---\n");
+                debugContextBuilder.append("--- BẮT ĐẦU FILE: ID [").append(currentDocId)
+                        .append("], TÊN [").append(doc.getFileName()).append("] ---\n");
+            }
+            contextBuilder.append("--- TRANG ").append(page.getPageNumber()).append(" ---\n");
+            contextBuilder.append(page.getContent()).append("\n\n");
+            
+            debugContextBuilder.append("--- TRANG ").append(page.getPageNumber()).append(" ---\n");
+            // Nếu trang này chứa ảnh nằm trong danh sách được chọn gửi, chèn thẻ img ngay dưới tiêu đề trang
+            String key = doc.getId() + "_" + page.getPageNumber();
+            if (pageImageMap.containsKey(key)) {
+                debugContextBuilder.append(String.format("<img src=\"data:image/jpeg;base64,%s\" />\n\n", pageImageMap.get(key)));
+            }
+            debugContextBuilder.append(page.getContent()).append("\n\n");
+        }
+        if (currentDocId != null) {
+            contextBuilder.append("--- KẾT THÚC FILE: ID [").append(currentDocId).append("] ---");
+            debugContextBuilder.append("--- KẾT THÚC FILE: ID [").append(currentDocId).append("] ---");
+        }
+        String context = contextBuilder.toString();
+        String debugContext = debugContextBuilder.toString();
+
+        // 5. Rút gọn câu hỏi dựa trên lịch sử lưu trong DB
+        List<ChatMessage> dbHistory = chatMessageRepository.findBySpaceIdAndDocumentIsNullOrderByCreatedAtAsc(request.getSpaceId());
+        List<ChatMessageDto> historyDtoList = dbHistory.stream()
+                .filter(m -> !m.getId().equals(userMessage.getId())) // loại bỏ tin nhắn vừa lưu
+                .map(msg -> ChatMessageDto.builder()
+                        .sender(msg.getSender())
+                        .text(msg.getText())
+                        .build())
+                .toList();
+
+        String condensedQuestion = getCondensedQuestion(historyDtoList, request.getQuestion());
+
         // 6. Tạo AI Assistant thông qua LangChain4j AiServices
         SpaceAssistant assistant = AiServices.builder(SpaceAssistant.class)
                 .chatLanguageModel(chatLanguageModel)
@@ -436,24 +492,36 @@ public class ChatServiceImpl implements ChatService {
         String fullPrompt = String.format("""
                 [SYSTEM PROMPT]
                 Bạn là một trợ lý học thuật nghiêm khắc.
-                Hãy trả lời câu hỏi của người dùng CHỈ sử dụng thông tin từ ngữ cảnh tài liệu được cung cấp dưới đây.
+                Hãy trả lời câu hỏi của người dùng CHỈ sử dụng thông tin từ ngữ cảnh tài liệu được cung cấp dưới đây (bao gồm cả nội dung văn bản và hình ảnh của tài liệu đó).
                 Ngữ cảnh chứa nhiều tài liệu khác nhau. Mỗi tài liệu được phân tách bằng '--- BẮT ĐẦU FILE: ID [id_cua_file], TÊN [tên file] ---' và '--- KẾT THÚC FILE...'.
-                Nếu ngữ cảnh chứa hình ảnh, hãy phân tích kỹ hình ảnh đó để hỗ trợ trả lời.
-                Nếu thông tin trong các tài liệu không đủ hoặc câu hỏi nằm ngoài phạm vi tài liệu, bạn bắt buộc phải trả lời 'false' cho trường 'answerFound', không được tự ý đoán mò, và đặt 'answer' thành câu từ chối trả lời phù hợp (Ví dụ: "Tôi không tìm thấy thông tin này trong các tài liệu của không gian học tập.").
+                Nếu tài liệu có hình ảnh đính kèm (hoặc bản thân tài liệu là hình ảnh), hãy phân tích kỹ hình ảnh và bạn ĐƯỢC PHÉP suy luận logic dựa trên hình ảnh để trả lời câu hỏi của người dùng.
+                Nếu thông tin trong các tài liệu (cả phần chữ và phần hình ảnh) không đủ hoặc câu hỏi nằm ngoài phạm vi tài liệu, bạn bắt buộc phải trả lời 'false' cho trường 'answerFound', không được tự ý đoán mò, và đặt 'answer' thành câu từ chối trả lời phù hợp (Ví dụ: "Tôi không tìm thấy thông tin này trong các tài liệu của không gian học tập.").
                 Trong mảng trích dẫn (citations), với mỗi trích dẫn bạn phải cung cấp chính xác 'documentId' (lấy từ ID [id_cua_file] trong tiêu đề file tương ứng) và 'pageNumber' của trang chứa câu trích dẫn đó.
                 
                 [USER MESSAGE]
                 Ngữ cảnh tài liệu:
                 %s
                 
-                Câu hỏi: %s""", context, condensedQuestion);
+                Câu hỏi: %s""", debugContext, condensedQuestion);
 
         // 7. Gọi Gemini và nhận kết quả cấu trúc
         try {
             SpaceChatResponse response;
             if (!imagesToSend.isEmpty()) {
+                logGeminiRequest(
+                        "Bạn là một trợ lý học thuật nghiêm khắc.\nHãy trả lời câu hỏi của người dùng CHỈ sử dụng thông tin từ ngữ cảnh tài liệu được cung cấp dưới đây (bao gồm cả nội dung văn bản và hình ảnh của tài liệu đó).\nNgữ cảnh chứa nhiều tài liệu khác nhau. Mỗi tài liệu được phân tách bằng '--- BẮT ĐẦU FILE: ID [id_cua_file], TÊN [tên file] ---' và '--- KẾT THÚC FILE...'.\nNếu tài liệu có hình ảnh đính kèm (hoặc bản thân tài liệu là hình ảnh), hãy phân tích kỹ hình ảnh và bạn ĐƯỢC PHÉP suy luận logic dựa trên hình ảnh để trả lời câu hỏi của người dùng.\nNếu thông tin trong các tài liệu (cả phần chữ và phần hình ảnh) không đủ hoặc câu hỏi nằm ngoài phạm vi tài liệu, bạn bắt buộc phải trả lời 'false' cho trường 'answerFound', không được tự ý đoán mò, và đặt 'answer' thành câu từ chối trả lời phù hợp (Ví dụ: \"Tôi không tìm thấy thông tin này trong các tài liệu của không gian học tập.\").\nTrong mảng trích dẫn (citations), với mỗi trích dẫn bạn phải cung cấp chính xác 'documentId' (lấy từ ID [id_cua_file] trong tiêu đề file tương ứng) và 'pageNumber' của trang chứa câu trích dẫn đó.",
+                        context,
+                        condensedQuestion,
+                        base64Images
+                );
                 response = assistant.chatWithImages(context, condensedQuestion, imagesToSend);
             } else {
+                logGeminiRequest(
+                        "Bạn là một trợ lý học thuật nghiêm khắc.\nHãy trả lời câu hỏi của người dùng CHỈ sử dụng thông tin từ ngữ cảnh tài liệu được cung cấp dưới đây (bao gồm cả nội dung văn bản và hình ảnh của tài liệu đó).\nNgữ cảnh chứa nhiều tài liệu khác nhau. Mỗi tài liệu được phân tách bằng '--- BẮT ĐẦU FILE: ID [id_cua_file], TÊN [tên file] ---' và '--- KẾT THÚC FILE...'.\nNếu tài liệu có hình ảnh đính kèm (hoặc bản thân tài liệu là hình ảnh), hãy phân tích kỹ hình ảnh và bạn ĐƯỢC PHÉP suy luận logic dựa trên hình ảnh để trả lời câu hỏi của người dùng.\nNếu thông tin trong các tài liệu (cả phần chữ và phần hình ảnh) không đủ hoặc câu hỏi nằm ngoài phạm vi tài liệu, bạn bắt buộc phải trả lời 'false' cho trường 'answerFound', không được tự ý đoán mò, và đặt 'answer' thành câu từ chối trả lời phù hợp (Ví dụ: \"Tôi không tìm thấy thông tin này trong các tài liệu của không gian học tập.\").\nTrong mảng trích dẫn (citations), với mỗi trích dẫn bạn phải cung cấp chính xác 'documentId' (lấy từ ID [id_cua_file] trong tiêu đề file tương ứng) và 'pageNumber' của trang chứa câu trích dẫn đó.",
+                        context,
+                        condensedQuestion,
+                        null
+                );
                 response = assistant.chat(context, condensedQuestion);
             }
             
@@ -551,5 +619,45 @@ public class ChatServiceImpl implements ChatService {
                 .condensedQuestion(msg.getCondensedQuestion())
                 .promptSent(msg.getPromptSent())
                 .build();
+    }
+
+    private void logGeminiRequest(String systemPrompt, String context, String question, List<String> base64Images) {
+        StringBuilder partsBuilder = new StringBuilder();
+        
+        // System Prompt + User Message Text
+        String text = String.format("[SYSTEM PROMPT]\n%s\n\n[USER MESSAGE]\nNgữ cảnh tài liệu:\n%s\n\nCâu hỏi: %s", systemPrompt, context, question);
+        
+        // Escape JSON characters in text
+        String escapedText = text.replace("\\", "\\\\")
+                                 .replace("\"", "\\\"")
+                                 .replace("\n", "\\n")
+                                 .replace("\r", "");
+        
+        partsBuilder.append("        {\n")
+                    .append("          \"text\": \"").append(escapedText).append("\"\n")
+                    .append("        }");
+        
+        if (base64Images != null) {
+            for (String base64 : base64Images) {
+                partsBuilder.append(",\n        {\n")
+                            .append("          \"inlineData\": {\n")
+                            .append("            \"mimeType\": \"image/jpeg\",\n")
+                            .append("            \"data\": \"").append(base64).append("\"\n")
+                            .append("          }\n")
+                            .append("        }");
+            }
+        }
+        
+        String json = "{\n" +
+                "  \"contents\": [\n" +
+                "    {\n" +
+                "      \"parts\": [\n" +
+                partsBuilder.toString() + "\n" +
+                "      ]\n" +
+                "    }\n" +
+                "  ]\n" +
+                "}";
+        
+        log.info("[GEMINI REQUEST JSON]:\n{}", json);
     }
 }
