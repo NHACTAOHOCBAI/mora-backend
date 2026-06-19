@@ -13,6 +13,7 @@ import java.util.List;
 @AllArgsConstructor
 public class DocumentImageDebugResponse {
     private Integer pageNumber;
+    private String pageContent;
     private List<ImageInfo> images;
 
     @Data

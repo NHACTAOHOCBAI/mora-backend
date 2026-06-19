@@ -29,6 +29,7 @@ import org.apache.pdfbox.cos.COSName;
 import org.apache.pdfbox.rendering.PDFRenderer;
 import org.apache.pdfbox.text.PDFTextStripper;
 import com.mora.backend.util.ImageUtil;
+import com.mora.backend.util.VectorGraphicsDetector;
 import java.awt.image.BufferedImage;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -186,6 +187,11 @@ public class DocumentServiceImpl implements DocumentService {
                             hasImg = true;
                             break;
                         }
+                    }
+                    PDPage pdfPage = pdfDocument.getPage(i - 1);
+                    VectorGraphicsDetector detector = new VectorGraphicsDetector();
+                    if (detector.detect(pdfPage, i)) {
+                        hasImg = true;
                     }
 
                     DocumentPage page = DocumentPage.builder()
@@ -588,6 +594,7 @@ public class DocumentServiceImpl implements DocumentService {
                 }
 
                 // Second pass: build the debug response list
+                List<DocumentPage> dbPages = documentPageRepository.findByDocumentIdOrderByPageNumberAsc(id);
                 for (int i = 1; i <= pageCount; i++) {
                     PDPage pdfPage = pdfDocument.getPage(i - 1);
                     List<DocumentImageDebugResponse.ImageInfo> imagesOnPage = new ArrayList<>();
@@ -650,8 +657,26 @@ public class DocumentServiceImpl implements DocumentService {
                                     .build());
                         }
                     }
+                    
+                    VectorGraphicsDetector detector = new VectorGraphicsDetector();
+                    if (detector.detect(pdfPage, i)) {
+                        imagesOnPage.add(DocumentImageDebugResponse.ImageInfo.builder()
+                                .name("Sơ đồ Vector")
+                                .type("VectorGraphics")
+                                .width(0)
+                                .height(0)
+                                .accepted(true)
+                                .filterReason(null)
+                                .build());
+                    }
+
+                    String pageContent = "";
+                    if (i - 1 < dbPages.size()) {
+                        pageContent = dbPages.get(i - 1).getContent();
+                    }
                     debugList.add(DocumentImageDebugResponse.builder()
                             .pageNumber(i)
+                            .pageContent(pageContent)
                             .images(imagesOnPage)
                             .build());
                 }
