@@ -15,6 +15,7 @@ public class DocumentImageDebugResponse {
     private Integer pageNumber;
     private String pageContent;
     private List<ImageInfo> images;
+    private Integer vectorPathCount;
 
     @Data
     @Builder

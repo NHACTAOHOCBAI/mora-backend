@@ -56,4 +56,7 @@ public class Document {
     @Lob
     @Column(name = "flashcards", columnDefinition = "TEXT")
     private String flashcards;
+
+    @Column(name = "vector_path_threshold")
+    private Integer vectorPathThreshold;
 }

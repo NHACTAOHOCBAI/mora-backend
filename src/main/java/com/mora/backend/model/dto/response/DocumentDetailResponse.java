@@ -22,4 +22,5 @@ public class DocumentDetailResponse {
     private List<DocumentPageResponse> pages;
     private String summary;
     private String flashcards;
+    private Integer vectorPathThreshold;
 }

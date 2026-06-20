@@ -10,12 +10,17 @@ import java.util.List;
 
 public class VectorGraphicsDetector extends PDFStreamEngine {
     private int pathCount = 0;
-    private static final int PATH_THRESHOLD = 30;
+    private final int pathThreshold;
 
     private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(VectorGraphicsDetector.class);
 
     public VectorGraphicsDetector() {
+        this(30);
+    }
+
+    public VectorGraphicsDetector(Integer threshold) {
         super();
+        this.pathThreshold = threshold != null ? threshold : 30;
     }
 
     public boolean detect(PDPage page, int pageNumber) {
@@ -26,7 +31,11 @@ public class VectorGraphicsDetector extends PDFStreamEngine {
         } catch (IOException e) {
             log.warn("[VECTOR-DETECTOR] Failed to process page {}: {}", pageNumber, e.getMessage());
         }
-        return this.pathCount > PATH_THRESHOLD;
+        return this.pathCount > this.pathThreshold;
+    }
+
+    public int getPathCount() {
+        return this.pathCount;
     }
 
     @Override

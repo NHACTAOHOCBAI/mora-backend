@@ -71,6 +71,7 @@ public class SpaceServiceImpl implements SpaceService {
                                 .map(DocumentPage::getPageNumber)
                                 .sorted()
                                 .toList())
+                        .vectorPathThreshold(doc.getVectorPathThreshold() != null ? doc.getVectorPathThreshold() : 30)
                         .build())
                 .toList();
 

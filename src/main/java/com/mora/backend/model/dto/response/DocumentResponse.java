@@ -20,4 +20,5 @@ public class DocumentResponse {
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
     private List<Integer> pagesWithImages;
+    private Integer vectorPathThreshold;
 }

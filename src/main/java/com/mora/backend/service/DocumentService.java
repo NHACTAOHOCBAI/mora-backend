@@ -12,9 +12,10 @@ public interface DocumentService {
      *
      * @param file File tải lên
      * @param spaceId ID của Space chứa tài liệu
+     * @param vectorPathThreshold Ngưỡng đếm vector path để phát hiện ảnh vector
      * @return DTO chứa thông tin tài liệu đã lưu
      */
-    DocumentResponse uploadAndProcessDocument(MultipartFile file, Long spaceId);
+    DocumentResponse uploadAndProcessDocument(MultipartFile file, Long spaceId, Integer vectorPathThreshold);
 
     /**
      * Lấy thông tin chi tiết tài liệu kèm nội dung các trang.
@@ -74,4 +75,13 @@ public interface DocumentService {
      * @return Byte array của hình ảnh dạng PNG
      */
     byte[] extractImageResource(Long documentId, int pageNumber, String imageName);
+
+    /**
+     * Cập nhật ngưỡng Vector Path cho tài liệu và quét lại hình ảnh các trang.
+     *
+     * @param id ID của tài liệu
+     * @param threshold Ngưỡng mới
+     * @return DTO chứa thông tin tài liệu đã cập nhật
+     */
+    DocumentResponse updateVectorPathThreshold(Long id, Integer threshold);
 }

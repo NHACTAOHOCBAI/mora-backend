@@ -52,7 +52,7 @@ public class DocumentServiceImpl implements DocumentService {
 
     @Override
     @Transactional
-    public DocumentResponse uploadAndProcessDocument(MultipartFile file, Long spaceId) {
+    public DocumentResponse uploadAndProcessDocument(MultipartFile file, Long spaceId, Integer vectorPathThreshold) {
         // Validation: Verify Space exists
         Space space = spaceRepository.findById(spaceId)
                 .orElseThrow(() -> {
@@ -98,6 +98,7 @@ public class DocumentServiceImpl implements DocumentService {
                 .fileType(fileType)
                 .storageUrl(storageUrl)
                 .space(space)
+                .vectorPathThreshold(vectorPathThreshold != null ? vectorPathThreshold : 30)
                 .build();
         document = documentRepository.save(document);
 
@@ -161,7 +162,7 @@ public class DocumentServiceImpl implements DocumentService {
                         }
                     }
                     PDPage pdfPage = pdfDocument.getPage(i - 1);
-                    VectorGraphicsDetector detector = new VectorGraphicsDetector();
+                    VectorGraphicsDetector detector = new VectorGraphicsDetector(document.getVectorPathThreshold());
                     if (detector.detect(pdfPage, i)) {
                         hasImg = true;
                     }
@@ -315,6 +316,7 @@ public class DocumentServiceImpl implements DocumentService {
                 .pages(pageResponses)
                 .summary(document.getSummary())
                 .flashcards(document.getFlashcards())
+                .vectorPathThreshold(document.getVectorPathThreshold() != null ? document.getVectorPathThreshold() : 30)
                 .build();
     }
 
@@ -427,6 +429,7 @@ public class DocumentServiceImpl implements DocumentService {
                         .map(DocumentPage::getPageNumber)
                         .sorted()
                         .toList() : List.of())
+                .vectorPathThreshold(document.getVectorPathThreshold() != null ? document.getVectorPathThreshold() : 30)
                 .build();
     }
 
@@ -615,8 +618,10 @@ public class DocumentServiceImpl implements DocumentService {
                         }
                     }
                     
-                    VectorGraphicsDetector detector = new VectorGraphicsDetector();
-                    if (detector.detect(pdfPage, i)) {
+                    VectorGraphicsDetector detector = new VectorGraphicsDetector(document.getVectorPathThreshold());
+                    boolean hasVector = detector.detect(pdfPage, i);
+                    int vectorPathCount = detector.getPathCount();
+                    if (hasVector) {
                         imagesOnPage.add(DocumentImageDebugResponse.ImageInfo.builder()
                                 .name("Sơ đồ Vector")
                                 .type("VectorGraphics")
@@ -635,6 +640,7 @@ public class DocumentServiceImpl implements DocumentService {
                             .pageNumber(i)
                             .pageContent(pageContent)
                             .images(imagesOnPage)
+                            .vectorPathCount(vectorPathCount)
                             .build());
                 }
             }
@@ -680,5 +686,95 @@ public class DocumentServiceImpl implements DocumentService {
             throw new RuntimeException("Lỗi trích xuất tài nguyên hình ảnh: " + e.getMessage(), e);
         }
         throw new RuntimeException("Không tìm thấy hình ảnh này trong tài liệu.");
+    }
+
+    @Override
+    @Transactional
+    public DocumentResponse updateVectorPathThreshold(Long id, Integer threshold) {
+        Document document = documentRepository.findById(id)
+                .orElseThrow(() -> {
+                    log.warn("Document with ID {} not found for updating threshold", id);
+                    return new AppException(ErrorCode.DOCUMENT_NOT_FOUND);
+                });
+
+        document.setVectorPathThreshold(threshold != null ? threshold : 30);
+        
+        // Re-process the document pages to re-detect vector graphics
+        if ("pdf".equalsIgnoreCase(document.getFileType())) {
+            try {
+                java.io.File cachedFile = getCachedPdfFile(id, document.getStorageUrl());
+                try (PDDocument pdfDocument = Loader.loadPDF(cachedFile)) {
+                    int pageCount = pdfDocument.getNumberOfPages();
+                    List<DocumentPage> pages = documentPageRepository.findByDocumentIdOrderByPageNumberAsc(id);
+                    
+                    // Re-calculate image status matching the evaluated images (Tier 1 uniqueness + vector graphics threshold)
+                    java.util.List<ImageInfoHolder> allImages = new java.util.ArrayList<>();
+                    java.util.List<java.util.List<ImageInfoHolder>> pageImages = new java.util.ArrayList<>();
+                    for (int i = 0; i < pageCount; i++) {
+                        pageImages.add(new java.util.ArrayList<>());
+                    }
+
+                    for (int i = 0; i < pageCount; i++) {
+                        PDPage pdfPage = pdfDocument.getPage(i);
+                        if (pdfPage.getResources() != null) {
+                            for (org.apache.pdfbox.cos.COSName name : pdfPage.getResources().getXObjectNames()) {
+                                if (pdfPage.getResources().isImageXObject(name)) {
+                                    org.apache.pdfbox.pdmodel.graphics.PDXObject xobj = pdfPage.getResources().getXObject(name);
+                                    if (xobj instanceof org.apache.pdfbox.pdmodel.graphics.image.PDImageXObject) {
+                                        org.apache.pdfbox.pdmodel.graphics.image.PDImageXObject image = 
+                                            (org.apache.pdfbox.pdmodel.graphics.image.PDImageXObject) xobj;
+                                        ImageFilterResult tier1 = evaluateTier1(image.getWidth(), image.getHeight());
+                                        if (tier1.accepted) {
+                                            java.awt.image.BufferedImage bufferedImage = null;
+                                            try {
+                                                bufferedImage = image.getImage();
+                                            } catch (Exception e) {
+                                                log.warn("Failed to get buffered image: {}", e.getMessage());
+                                            }
+                                            if (bufferedImage != null) {
+                                                long pHash = calculatePerceptualHash(bufferedImage);
+                                                ImageInfoHolder holder = new ImageInfoHolder(image.getWidth(), image.getHeight(), pHash);
+                                                allImages.add(holder);
+                                                pageImages.get(i).add(holder);
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    for (int i = 1; i <= pageCount; i++) {
+                        boolean hasImg = false;
+                        if (i - 1 < pageImages.size()) {
+                            for (ImageInfoHolder holder : pageImages.get(i - 1)) {
+                                int occurrences = countSimilarOccurrences(holder, allImages);
+                                if (occurrences == 1) {
+                                    hasImg = true;
+                                    break;
+                                }
+                            }
+                        }
+                        PDPage pdfPage = pdfDocument.getPage(i - 1);
+                        VectorGraphicsDetector detector = new VectorGraphicsDetector(document.getVectorPathThreshold());
+                        if (detector.detect(pdfPage, i)) {
+                            hasImg = true;
+                        }
+
+                        if (i - 1 < pages.size()) {
+                            DocumentPage page = pages.get(i - 1);
+                            page.setHasImage(hasImg);
+                        }
+                    }
+                    documentPageRepository.saveAll(pages);
+                }
+            } catch (IOException e) {
+                log.error("Failed to re-process document pages for threshold update", e);
+                throw new RuntimeException("Lỗi xử lý tài liệu khi cập nhật ngưỡng: " + e.getMessage(), e);
+            }
+        }
+        
+        document = documentRepository.save(document);
+        return convertToDocumentResponse(document);
     }
 }

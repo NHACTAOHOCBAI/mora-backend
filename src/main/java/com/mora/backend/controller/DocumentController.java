@@ -26,8 +26,9 @@ public class DocumentController {
     @Operation(summary = "Tải lên file PDF và tự động bóc tách nội dung từng trang")
     public ResponseEntity<DocumentResponse> uploadDocument(
             @RequestParam("file") MultipartFile file,
-            @RequestParam("spaceId") Long spaceId) {
-        DocumentResponse response = documentService.uploadAndProcessDocument(file, spaceId);
+            @RequestParam("spaceId") Long spaceId,
+            @RequestParam(value = "vectorPathThreshold", required = false) Integer vectorPathThreshold) {
+        DocumentResponse response = documentService.uploadAndProcessDocument(file, spaceId, vectorPathThreshold);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
@@ -78,5 +79,14 @@ public class DocumentController {
         return ResponseEntity.ok()
                 .contentType(MediaType.IMAGE_PNG)
                 .body(imageBytes);
+    }
+
+    @PatchMapping("/{id}/threshold")
+    @Operation(summary = "Cập nhật ngưỡng vector path và quét lại hình ảnh trong tài liệu")
+    public ResponseEntity<DocumentResponse> updateThreshold(
+            @PathVariable("id") Long id,
+            @RequestParam("threshold") Integer threshold) {
+        DocumentResponse response = documentService.updateVectorPathThreshold(id, threshold);
+        return ResponseEntity.ok(response);
     }
 }
