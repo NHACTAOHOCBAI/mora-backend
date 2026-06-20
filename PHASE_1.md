@@ -30,8 +30,8 @@ Giai đoạn này tập trung hoàn toàn vào việc hiện thực hóa mô hì
 
 - **Ý tưởng thiết kế Kỷ luật Prompt & Ép xuất cấu trúc (JSON Schema):**
   - _Tham số kiểm soát:_ Cài đặt độ sáng tạo (`temperature`) của AI về mức bằng 0 để ép mô hình suy luận logic tối đa và loại bỏ tính sáng tạo tự do gây ra ảo tưởng (hallucination).
-  - _System Prompt (Luật thép):_ Định nghĩa vai trò cho AI là một người trợ lý học thuật nghiêm khắc. Ra lệnh cho AI chỉ được phép dùng thông tin có trong ngữ cảnh được cung cấp để trả lời. Nếu câu hỏi nằm ngoài phạm vi tài liệu, AI bắt buộc phải trả về thông báo từ chối thay vì đoán mò.
-  - _Cấu trúc đầu ra (JSON Schema):_ Tận dụng tính năng **Structured Outputs** của Gemini để ép mô hình trả về một cấu trúc JSON cố định gồm 3 phần: Trạng thái tìm thấy câu trả lời (`true`/`false`), Nội dung câu trả lời hoàn chỉnh, và Mảng chứa danh sách trích dẫn (mỗi phần tử trích dẫn bao gồm: cụm từ gốc nằm trong tài liệu và số trang chính xác chứa cụm từ đó).
+  - _System Prompt (Luật thép):_ Định nghĩa vai trò cho AI là một người trợ lý học thuật nghiêm khắc. Ra lệnh cho AI chỉ được phép dùng thông tin có trong ngữ cảnh được cung cấp để trả lời. Nếu câu hỏi nằm ngoài phạm vi tài liệu, AI bắt buộc phải trả về thông báo từ chối thay vì đoán mò. Khi người dùng yêu cầu so sánh, đối chiếu, AI bắt buộc phải trình bày câu trả lời dưới dạng Bảng Markdown (chèn ký tự xuống dòng `\n` thực tế ở cuối mỗi dòng của bảng) hoặc danh sách đối chiếu rõ ràng. Nếu thiếu thông tin của bất kỳ khái niệm/thực thể nào trong câu hỏi so sánh, đặt `answerFound` thành false và phản hồi ngọt ngào chỉ rõ phần thông tin bị thiếu.
+  - _Cấu trúc đầu ra (JSON Schema):_ Tận dụng tính năng **Structured Outputs** của Gemini để ép mô hình trả về một cấu trúc JSON cố định gồm 3 phần: Trạng thái tìm thấy câu trả lời (`true`/`false`), Nội dung câu trả lời hoàn chỉnh (chứa nội dung bảng hoặc văn bản so sánh), và Mảng chứa danh sách trích dẫn (mỗi phần tử trích dẫn bao gồm: cụm từ gốc nằm trong tài liệu và số trang chính xác chứa cụm từ đó).
 
 ### 📌 Bước 3: Ý tưởng giao diện chia đôi và Trích dẫn tương tác (Frontend - React)
 
