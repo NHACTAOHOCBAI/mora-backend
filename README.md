@@ -53,6 +53,7 @@ com.mora.backend
     *   Tải tài liệu gốc định dạng PDF lên Supabase Cloud Storage.
     *   Sử dụng **Apache PDFBox** để bóc tách nội dung văn bản (text extraction) độc lập theo từng trang (Page-by-page mapping).
     *   Lưu thông tin metadata của tài liệu và nội dung chi tiết từng trang vào PostgreSQL.
+    *   **Phát hiện Vector Graphics và Image:** Nhận diện các trang chứa sơ đồ vector thông qua bộ đếm nét vẽ và so sánh với ngưỡng `vectorPathThreshold` cấu hình trên từng tài liệu (mặc định là 30, tùy chỉnh linh hoạt từ 5 đến 200).
 2.  **Tích hợp AI Engine (Python microservice `mora-ai` & Gemini SDK):**
     *   **Hỏi đáp Source-Grounded (RAG):** Gửi yêu cầu qua `AiServiceClient` sang Python Server để hỏi đáp dựa trên ngữ cảnh tài liệu (độc lập hoặc toàn bộ Space).
     *   **Trích dẫn trang (Citations):** Gemini trả về danh sách trích dẫn (quote gốc trong file PDF, số trang, mã tài liệu) qua cấu trúc JSON chuẩn.
@@ -77,6 +78,10 @@ Sau khi khởi chạy ứng dụng thành công, tài liệu Swagger UI sẽ kh�
 *   `GET /api/documents/{id}` - Lấy thông tin chi tiết tài liệu kèm các trang.
 *   `DELETE /api/documents/{id}` - Xóa tài liệu khỏi hệ thống.
 *   `POST /api/documents/{id}/generate-study-notes` - Sinh tóm tắt & Flashcards cho tài liệu bằng AI.
+*   `PATCH /api/documents/{id}/rename` - Đổi tên tài liệu.
+*   `GET /api/documents/{id}/debug-images` - Debug xem danh sách hình ảnh trích xuất của từng trang.
+*   `GET /api/documents/{id}/pages/{pageNumber}/images/{imageName}` - Tải/trích xuất ảnh gốc từ trang PDF dưới dạng PNG.
+*   `PATCH /api/documents/{id}/threshold` - Cập nhật cấu hình ngưỡng Vector Path và tự động quét lại toàn bộ hình ảnh trong tài liệu.
 *   `POST /api/chat` - Hỏi đáp với tài liệu cụ thể.
 *   `POST /api/chat/space` - Hỏi đáp trên toàn bộ Không gian học tập (nhiều tài liệu).
 *   `GET /api/chat/document/{documentId}` - Lấy lịch sử chat của tài liệu.

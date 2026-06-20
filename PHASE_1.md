@@ -45,7 +45,7 @@ Giai đoạn này tập trung hoàn toàn vào việc hiện thực hóa mô hì
 
 ### 📌 Bước 4: Mở rộng Lõi AI hướng Đa phương thức và Đa tài liệu (Advanced AI Scope)
 
-Nhằm nâng cao tính học thuật và giá trị thực tiễn của đồ án, hệ thống phát triển thêm 3 trục tính năng nâng cao dựa trên kiến trúc lõi sẵn có:
+Nhằm nâng cao tính học thuật và giá trị thực tiễn của đồ án, hệ thống phát triển thêm các trục tính năng nâng cao dựa trên kiến trúc lõi sẵn có:
 
 1. **Ý tưởng Trợ lý Không gian học tập (Space-Wide Multi-Document Chat):**
    - _Mô tả:_ Tự động hóa quá trình khai thác tri thức. Người dùng chỉ cần đặt câu hỏi trong Không gian học tập (Space), AI sẽ tự động tổng hợp, đối chiếu và trả lời dựa trên TOÀN BỘ các tài liệu hiện có trong Space đó mà không cần người dùng chọn thủ công từng file.
@@ -76,18 +76,29 @@ Nhằm nâng cao tính học thuật và giá trị thực tiễn của đồ á
      - Khi cần đọc hiểu nội dung trang PDF chứa ảnh, hệ thống gọi dịch vụ tải PDF từ bộ nhớ đệm (Local Cache) để tránh tải lại nhiều lần từ Supabase.
      - Sử dụng PDFRenderer.renderImageWithDPI(pageIndex, 150) để chuyển trang PDF thành một đối tượng BufferedImage với độ phân giải 150 DPI.
      - Nén và tối ưu hóa ảnh thông qua ImageUtil.resizeAndCompress (giới hạn kích thước tối đa 1024px và chất lượng nén JPG 80%) để thu được luồng dữ liệu byte ảnh tối ưu hóa nhất trước khi chuyển sang Base64 gửi lên Gemini.
-    - *Tích hợp kết nối qua Python AI Microservice (mora-ai):*
-      - Thay vì gọi trực tiếp LangChain4j ở Java, Spring Boot gửi dữ liệu hình ảnh (Base64 JPEG) và văn bản ngữ cảnh qua HTTP Client (RestTemplate) sang Python Server.
-      - Python Server (`mora-ai`) tiếp nhận, chuyển đổi Base64 thành dữ liệu nhị phân (`inlineData`) thông qua `types.Part.from_bytes` và truyền cho Google GenAI SDK để gọi Gemini API xử lý chính xác và tối ưu.
+   - *Tích hợp kết nối qua Python AI Microservice (mora-ai):*
+     - Thay vì gọi trực tiếp LangChain4j ở Java, Spring Boot gửi dữ liệu hình ảnh (Base64 JPEG) và văn bản ngữ cảnh qua HTTP Client (RestTemplate) sang Python Server.
+     - Python Server (`mora-ai`) tiếp nhận, chuyển đổi Base64 thành dữ liệu nhị phân (`inlineData`) thông qua `types.Part.from_bytes` và truyền cho Google GenAI SDK để gọi Gemini API xử lý chính xác và tối ưu.
    - *Các API Gỡ lỗi & Trích xuất Tài nguyên mới:*
      - **API Debug Ảnh (GET /api/documents/{id}/debug-images):** Trả về danh sách chi tiết tất cả các đối tượng đồ họa được phát hiện trên từng trang PDF kèm các thông tin như tên XObject, kích thước, định dạng, trạng thái được chấp nhận (accepted) và lý do từ chối cụ thể (filterReason - ví dụ: "Trùng lặp ở Tầng 2 (xuất hiện X lần)", "Kích thước quá nhỏ...").
      - **API Trích xuất Ảnh gốc (GET /api/documents/{id}/pages/{pageNumber}/images/{imageName}):** Cho phép kết xuất động và tải xuống trực tiếp file ảnh gốc dưới định dạng PNG từ tài nguyên trang PDF, hỗ trợ việc hiển thị trực quan dữ liệu debug trên giao diện Frontend.
-   - *Giao diện Debug Mode & Trình kiểm thử ở Frontend:*
-     - Khi bật công tắc Chế độ Debug ở Sidebar, Frontend hiển thị danh sách các thẻ trang chứa hình ảnh dưới mỗi tài liệu. Click vào thẻ trang để nhảy ngay tới trang PDF tương ứng.
-     - Nút debug hình ảnh (icon con bọ Bug) hiển thị cạnh tên tài liệu sẽ mở ra một Dialog Debug Hình Ảnh chi tiết. Hộp thoại này tải dữ liệu từ /api/documents/{id}/debug-images và hiển thị trạng thái của từng đối tượng đồ họa trên các trang.
-     - Các ảnh được chấp nhận sẽ được render dưới dạng ảnh thumbnail thu nhỏ (sử dụng API trích xuất ảnh gốc ở trên). Người dùng có thể click vào thumbnail để phóng to ảnh thu được (Zoom View), giúp kiểm tra trực quan chất lượng trích xuất của hệ thống.
-   - *Tính minh bạch & Giao diện gỡ lỗi Prompt (Prompt Debugger):*
-     - Hệ thống tự động ghi nhận chính xác toàn bộ nội dung prompt thực tế đã gửi lên Gemini (bao gồm cả các thẻ ảnh Base64) vào trường prompt_sent trong bảng ChatMessage.
-     - Ở Frontend, người dùng có thể double-click (nhấp đúp) vào bất kỳ bong bóng tin nhắn nào của AI để hiển thị ngay lập tức một popup Shadcn UI Dialog chứa thông tin prompt chi tiết, giúp phục vụ việc kiểm thử, gỡ lỗi và đánh giá độ chính xác của ngữ cảnh.
-   - *Xử lý an toàn khi xóa file (Robust Delete):*
-     - Triển khai cơ chế xử lý ngoại lệ thông minh khi xóa tài liệu khỏi Supabase Storage. Nếu file đã bị xóa trước đó trên Storage (lỗi 404/Object not found), hệ thống sẽ ghi log WARN và tiếp tục dọn dẹp sạch sẽ các bản ghi liên quan dưới database PostgreSQL để đảm bảo tính nhất quán của hệ thống.
+     - **API Cập nhật Ngưỡng Vector Path (PATCH /api/documents/{id}/threshold?threshold={value}):** Cho phép cập nhật động ngưỡng vector path và quét lại toàn bộ tài liệu để cập nhật lại danh sách hình ảnh/sơ đồ và trạng thái `hasImage` của từng trang.
+
+4. **Giao diện Developer Mode (Chế độ Debug) & Trình kiểm thử ở Frontend:**
+   - **Quản lý trạng thái:** Trạng thái bật/tắt của chế độ Developer Mode được lưu trữ trực tiếp trong trình duyệt người dùng qua `localStorage` với khóa `mora_dev_mode` nhằm đảm bảo trạng thái này được duy trì qua các lần tải lại trang hoặc điều hướng.
+   - **Phân tách giao diện người dùng và nhà phát triển (User vs. Dev Mode):**
+     - *Khi tắt Developer Mode:* Hệ thống ẩn toàn bộ các thành phần phân tích kỹ thuật và gỡ lỗi (slider điều chỉnh ngưỡng Vector Path, biểu tượng "Bug" debug hình ảnh trên danh sách tài liệu, thông tin câu hỏi tối ưu (condensed question) và tính năng xem prompt chi tiết bằng thao tác double-click trên hội thoại). Giao diện hiển thị ở dạng tối giản, tối ưu trải nghiệm học tập sạch sẽ cho học sinh/sinh viên.
+     - *Khi bật Developer Mode:* Kích hoạt các công cụ gỡ lỗi nâng cao cho lập trình viên/quản trị viên:
+       - Danh sách các thẻ trang chứa hình ảnh dưới mỗi tài liệu. Click vào thẻ trang để nhảy ngay tới trang PDF tương ứng trong Viewer.
+       - Nút debug hình ảnh (icon con bọ Bug) hiển thị cạnh tên tài liệu sẽ mở ra một Dialog Debug Hình Ảnh chi tiết. Hộp thoại này tải dữ liệu từ `/api/documents/{id}/debug-images` và hiển thị trạng thái của từng đối tượng đồ họa trên các trang.
+       - Các ảnh được chấp nhận sẽ được render dưới dạng ảnh thumbnail thu nhỏ (sử dụng API trích xuất ảnh gốc ở trên). Người dùng có thể click vào thumbnail để phóng to ảnh thu được (Zoom View), giúp kiểm tra trực quan chất lượng trích xuất của hệ thống.
+   - **Ngưỡng Vector Path có thể điều chỉnh linh hoạt (Customizable Vector Path Threshold):**
+     - Trong Developer Mode, một slider điều khiển trực quan (ngưỡng từ 5 đến 200) được tích hợp trong sidebar không gian làm việc.
+     - Khi người dùng kéo thả và hoàn thành thay đổi (kích hoạt sự kiện `onMouseUp` hoặc `onTouchEnd`), hệ thống sẽ gửi yêu cầu cập nhật lên backend qua API `PATCH /api/documents/{id}/threshold?threshold={value}`.
+     - Backend sau khi nhận yêu cầu sẽ tự động tải file từ cache, thực hiện phân tích lại cấu trúc Vector và cập nhật lại trạng thái hình ảnh của toàn bộ các trang tài liệu tức thời mà không cần upload lại file gốc.
+   - **Tính minh bạch & Giao diện gỡ lỗi Prompt (Prompt Debugger):**
+     - Hệ thống tự động ghi nhận chính xác toàn bộ nội dung prompt thực tế đã gửi lên Gemini (bao gồm cả các thẻ ảnh Base64) vào trường `prompt_sent` trong bảng `ChatMessage`.
+     - Ở Frontend, khi đang bật Developer Mode, người dùng có thể double-click (nhấp đúp) vào bất kỳ bong bóng tin nhắn nào của AI để hiển thị ngay lập tức một popup Dialog chứa thông tin prompt chi tiết dưới dạng mã nguồn thô (bao gồm cả ảnh inlineData), hỗ trợ đánh giá độ chính xác ngữ cảnh một cách nhanh nhất.
+
+5. **Xử lý an toàn khi xóa file (Robust Delete):**
+   - Triển khai cơ chế xử lý ngoại lệ thông minh khi xóa tài liệu khỏi Supabase Storage. Nếu file đã bị xóa trước đó trên Storage (lỗi 404/Object not found), hệ thống sẽ ghi log WARN và tiếp tục dọn dẹp sạch sẽ các bản ghi liên quan dưới database PostgreSQL để đảm bảo tính nhất quán của hệ thống.
