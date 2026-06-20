@@ -76,15 +76,17 @@ public class ChatServiceImpl implements ChatService {
         chatMessageRepository.save(userMessage);
 
         // 3. Kiểm tra và chuẩn bị ảnh để gửi kèm nếu có trang chứa hình ảnh (Đưa lên trước để đưa vào debugContext)
-        String base64Image = null;
-        DocumentPage pageWithImage = null;
+        List<String> base64Images = new ArrayList<>();
+        java.util.Map<Integer, String> pageImageMap = new java.util.HashMap<>();
         boolean isPdf = "pdf".equalsIgnoreCase(document.getFileType());
 
         if (!isPdf) {
             try {
                 byte[] imageBytes = documentService.renderPageImage(document.getId(), 1);
                 if (imageBytes != null && imageBytes.length > 0) {
-                    base64Image = Base64.getEncoder().encodeToString(imageBytes);
+                    String base64Str = Base64.getEncoder().encodeToString(imageBytes);
+                    base64Images.add(base64Str);
+                    pageImageMap.put(1, base64Str);
                 }
             } catch (Exception e) {
                 log.warn("Lỗi khi kết xuất ảnh cho tài liệu hình ảnh", e);
@@ -92,33 +94,40 @@ public class ChatServiceImpl implements ChatService {
         } else {
             int targetPage = extractPageNumber(request.getQuestion());
             
+            // Prioritize the page matching targetPage if it has an image
             if (targetPage > 0) {
                 for (DocumentPage page : pages) {
                     if (page.getPageNumber() == targetPage && Boolean.TRUE.equals(page.getHasImage())) {
-                        pageWithImage = page;
+                        try {
+                            byte[] imageBytes = documentService.renderPageImage(document.getId(), page.getPageNumber());
+                            if (imageBytes != null && imageBytes.length > 0) {
+                                String base64Str = Base64.getEncoder().encodeToString(imageBytes);
+                                base64Images.add(base64Str);
+                                pageImageMap.put(page.getPageNumber(), base64Str);
+                                log.info("Đã tự động gửi kèm ảnh của trang {} (được yêu cầu) để trợ giúp hỏi đáp", page.getPageNumber());
+                            }
+                        } catch (Exception e) {
+                            log.warn("Lỗi khi render trang {} làm ảnh", page.getPageNumber(), e);
+                        }
                         break;
                     }
                 }
             }
             
-            if (pageWithImage == null) {
-                for (DocumentPage page : pages) {
-                    if (Boolean.TRUE.equals(page.getHasImage())) {
-                        pageWithImage = page;
-                        break;
+            // Fill other pages that have images
+            for (DocumentPage page : pages) {
+                if (Boolean.TRUE.equals(page.getHasImage()) && !pageImageMap.containsKey(page.getPageNumber())) {
+                    try {
+                        byte[] imageBytes = documentService.renderPageImage(document.getId(), page.getPageNumber());
+                        if (imageBytes != null && imageBytes.length > 0) {
+                            String base64Str = Base64.getEncoder().encodeToString(imageBytes);
+                            base64Images.add(base64Str);
+                            pageImageMap.put(page.getPageNumber(), base64Str);
+                            log.info("Đã tự động gửi kèm ảnh của trang {} để trợ giúp hỏi đáp", page.getPageNumber());
+                        }
+                    } catch (Exception e) {
+                        log.warn("Lỗi khi render trang {} làm ảnh", page.getPageNumber(), e);
                     }
-                }
-            }
-            
-            if (pageWithImage != null) {
-                try {
-                    byte[] imageBytes = documentService.renderPageImage(document.getId(), pageWithImage.getPageNumber());
-                    if (imageBytes != null && imageBytes.length > 0) {
-                        base64Image = Base64.getEncoder().encodeToString(imageBytes);
-                        log.info("Đã tự động gửi kèm ảnh của trang {} để trợ giúp hỏi đáp", pageWithImage.getPageNumber());
-                    }
-                } catch (Exception e) {
-                    log.warn("Lỗi khi render trang {} làm ảnh", pageWithImage.getPageNumber(), e);
                 }
             }
         }
@@ -136,8 +145,8 @@ public class ChatServiceImpl implements ChatService {
             
             debugContextBuilder.append("--- TRANG ").append(page.getPageNumber()).append(" ---\n");
             // Nếu trang này chứa ảnh được chọn gửi, chèn thẻ img ngay sau tiêu đề trang trong debugContext
-            if (base64Image != null && ((!isPdf && page.getPageNumber() == 1) || (pageWithImage != null && page.getPageNumber() == pageWithImage.getPageNumber()))) {
-                debugContextBuilder.append(String.format("<img src=\"data:image/jpeg;base64,%s\" />\n\n", base64Image));
+            if (pageImageMap.containsKey(page.getPageNumber())) {
+                debugContextBuilder.append(String.format("<img src=\"data:image/jpeg;base64,%s\" />\n\n", pageImageMap.get(page.getPageNumber())));
             }
             debugContextBuilder.append(page.getContent()).append("\n\n");
         }
@@ -164,10 +173,10 @@ public class ChatServiceImpl implements ChatService {
                     "Bạn là một trợ lý học thuật nghiêm khắc.\nHãy trả lời câu hỏi của người dùng CHỈ sử dụng thông tin từ ngữ cảnh tài liệu được cung cấp dưới đây (bao gồm cả nội dung văn bản và hình ảnh của tài liệu đó).\nNếu tài liệu có hình ảnh đính kèm (hoặc bản thân tài liệu là hình ảnh), hãy phân tích kỹ hình ảnh và bạn ĐƯỢC PHÉP suy luận logic dựa trên hình ảnh để trả lời câu hỏi của người dùng.\nNếu thông tin trong tài liệu (cả phần chữ và phần hình ảnh) không đủ hoặc câu hỏi nằm ngoài phạm vi tài liệu, bạn bắt buộc phải trả lời 'false' cho trường 'answerFound', không được tự ý đoán mò, và đặt 'answer' thành câu từ chối trả lời phù hợp (Ví dụ: \"Tôi không tìm thấy thông tin này trong tài liệu.\").",
                     context,
                     request.getQuestion(),
-                    base64Image != null ? List.of(base64Image) : null
+                    base64Images
             );
             
-            DocumentChatResponse response = aiServiceClient.chatWithDocument(context, request.getQuestion(), base64Image, historyDtoList);
+            DocumentChatResponse response = aiServiceClient.chatWithDocument(context, request.getQuestion(), base64Images, historyDtoList);
             
             String actualCondensedQuestion = response.getCondensedQuestion() != null ? response.getCondensedQuestion() : request.getQuestion();
             String fullPrompt = String.format("""
@@ -263,10 +272,9 @@ public class ChatServiceImpl implements ChatService {
                 .build();
         chatMessageRepository.save(userMessage);
 
-        // 3. Kiểm tra và chuẩn bị ảnh từ các trang chứa hình ảnh (tối đa 3 ảnh) (Đưa lên trước để đưa vào debugContext)
+        // 3. Kiểm tra và chuẩn bị ảnh từ các trang chứa hình ảnh (không giới hạn ảnh) (Đưa lên trước để đưa vào debugContext)
         List<String> base64Images = new ArrayList<>();
         java.util.Map<String, String> pageImageMap = new java.util.HashMap<>();
-        int imageCount = 0;
         for (DocumentPage page : pages) {
             if (Boolean.TRUE.equals(page.getHasImage())) {
                 try {
@@ -277,11 +285,6 @@ public class ChatServiceImpl implements ChatService {
                         
                         String key = page.getDocument().getId() + "_" + page.getPageNumber();
                         pageImageMap.put(key, base64Str);
-                        
-                        imageCount++;
-                        if (imageCount >= 3) {
-                            break;
-                        }
                     }
                 } catch (Exception e) {
                     log.warn("Lỗi render ảnh trong Space Chat cho doc {}, page {}", page.getDocument().getId(), page.getPageNumber(), e);

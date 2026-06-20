@@ -21,12 +21,12 @@ public class AiServiceClient {
     @Value("${ai-service.url:http://localhost:8000}")
     private String aiServiceUrl;
 
-    public DocumentChatResponse chatWithDocument(String context, String question, String base64Image, List<ChatMessageDto> history) {
+    public DocumentChatResponse chatWithDocument(String context, String question, List<String> base64Images, List<ChatMessageDto> history) {
         String url = aiServiceUrl + "/api/chat/document";
         Map<String, Object> request = Map.of(
                 "context", context,
                 "question", question,
-                "base64Image", base64Image != null ? base64Image : "",
+                "base64Images", base64Images != null ? base64Images : List.of(),
                 "history", history != null ? history : List.of()
         );
         try {
