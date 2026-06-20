@@ -212,7 +212,7 @@ public class ChatServiceImpl implements ChatService {
 
             ChatMessage assistantMessage = ChatMessage.builder()
                     .sender("assistant")
-                    .text(response.isAnswerFound() ? response.getAnswer() : "Tôi không thể tìm thấy câu trả lời cho câu hỏi này trong nội dung tài liệu.")
+                    .text(response.getAnswer())
                     .document(document)
                     .space(document.getSpace())
                     .citations(citationsJson)
@@ -386,7 +386,7 @@ public class ChatServiceImpl implements ChatService {
 
             ChatMessage assistantMessage = ChatMessage.builder()
                     .sender("assistant")
-                    .text(response.isAnswerFound() ? response.getAnswer() : "Tôi không tìm thấy câu trả lời phù hợp trong các tài liệu của không gian học tập.")
+                    .text(response.getAnswer())
                     .document(null)
                     .space(space)
                     .citations(citationsJson)
