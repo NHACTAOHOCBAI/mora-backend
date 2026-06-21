@@ -31,6 +31,9 @@ public class AiServiceClient {
         );
         try {
             return restTemplate.postForObject(url, request, DocumentChatResponse.class);
+        } catch (org.springframework.web.client.HttpStatusCodeException e) {
+            log.error("Failed to call Python AI service /api/chat/document. Error response: {}", e.getResponseBodyAsString(), e);
+            throw new RuntimeException("Lỗi từ AI Engine: " + e.getResponseBodyAsString(), e);
         } catch (Exception e) {
             log.error("Failed to call Python AI service /api/chat/document", e);
             throw new RuntimeException("Lỗi kết nối tới AI Engine: " + e.getMessage(), e);
@@ -47,6 +50,9 @@ public class AiServiceClient {
         );
         try {
             return restTemplate.postForObject(url, request, SpaceChatResponse.class);
+        } catch (org.springframework.web.client.HttpStatusCodeException e) {
+            log.error("Failed to call Python AI service /api/chat/space. Error response: {}", e.getResponseBodyAsString(), e);
+            throw new RuntimeException("Lỗi từ AI Engine: " + e.getResponseBodyAsString(), e);
         } catch (Exception e) {
             log.error("Failed to call Python AI service /api/chat/space", e);
             throw new RuntimeException("Lỗi kết nối tới AI Engine: " + e.getMessage(), e);
@@ -68,6 +74,9 @@ public class AiServiceClient {
         Map<String, Object> request = Map.of("context", context);
         try {
             return restTemplate.postForObject(url, request, StudyNotesResponse.class);
+        } catch (org.springframework.web.client.HttpStatusCodeException e) {
+            log.error("Failed to call Python AI service /api/study/notes. Error response: {}", e.getResponseBodyAsString(), e);
+            throw new RuntimeException("Lỗi từ AI Engine: " + e.getResponseBodyAsString(), e);
         } catch (Exception e) {
             log.error("Failed to call Python AI service /api/study/notes", e);
             throw new RuntimeException("Lỗi kết nối tới AI Engine: " + e.getMessage(), e);
