@@ -5,6 +5,7 @@ WORKDIR /app
 # Sao chép các file cấu hình maven
 COPY .mvn/ .mvn
 COPY mvnw pom.xml ./
+RUN chmod +x mvnw
 RUN ./mvnw dependency:go-offline
 
 # Sao chép source code và build
