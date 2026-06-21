@@ -1,5 +1,5 @@
 # Build stage
-FROM eclipse-temurin:21-jdk-jammy AS build
+FROM eclipse-temurin:26-jdk AS build
 WORKDIR /app
 
 # Sao chép các file cấu hình maven
@@ -12,7 +12,7 @@ COPY src ./src
 RUN ./mvnw clean package -DskipTests
 
 # Run stage
-FROM eclipse-temurin:21-jre-jammy
+FROM eclipse-temurin:26-jre
 WORKDIR /app
 COPY --from=build /app/target/mora-backend-0.0.1-SNAPSHOT.jar app.jar
 
