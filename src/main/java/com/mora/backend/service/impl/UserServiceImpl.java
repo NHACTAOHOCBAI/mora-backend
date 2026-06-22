@@ -7,6 +7,11 @@ import com.mora.backend.model.dto.request.LoginRequest;
 import com.mora.backend.model.dto.request.RegisterRequest;
 import com.mora.backend.model.dto.response.AuthResponse;
 import com.mora.backend.model.dto.response.UserResponse;
+import com.mora.backend.model.dto.response.PageResponse;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import com.mora.backend.model.entity.Role;
 import com.mora.backend.model.entity.User;
 import com.mora.backend.repository.UserRepository;
@@ -126,11 +131,25 @@ public class UserServiceImpl implements UserService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<UserResponse> getAllUsers() {
-        log.info("Fetching all users by admin");
-        return userRepository.findAll().stream()
+    public PageResponse<UserResponse> getAllUsers(int page, int limit, String search, String sortBy, String sortOrder) {
+        log.info("Fetching paginated users by admin, page={}, limit={}, search={}", page, limit, search);
+        Sort sort = Sort.by(Sort.Direction.fromString(sortOrder.toUpperCase()), sortBy);
+        Pageable pageable = PageRequest.of(page - 1, limit, sort);
+
+        Page<User> userPage = userRepository.searchUsers(search, pageable);
+
+        List<UserResponse> data = userPage.getContent().stream()
                 .map(this::mapToUserResponse)
                 .collect(Collectors.toList());
+
+        PageResponse.Pagination pagination = new PageResponse.Pagination(
+                userPage.getTotalElements(),
+                page,
+                limit
+        );
+        PageResponse.Meta meta = new PageResponse.Meta(pagination);
+
+        return new PageResponse<>(data, meta);
     }
 
     @Override

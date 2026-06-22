@@ -5,6 +5,7 @@ import com.mora.backend.model.dto.request.LoginRequest;
 import com.mora.backend.model.dto.request.RegisterRequest;
 import com.mora.backend.model.dto.response.AuthResponse;
 import com.mora.backend.model.dto.response.UserResponse;
+import com.mora.backend.model.dto.response.PageResponse;
 import com.mora.backend.model.entity.User;
 
 import java.util.List;
@@ -14,6 +15,6 @@ public interface UserService {
     AuthResponse login(LoginRequest request);
     User getCurrentUser();
     UserResponse getCurrentUserResponse();
-    List<UserResponse> getAllUsers();
+    PageResponse<UserResponse> getAllUsers(int page, int limit, String search, String sortBy, String sortOrder);
     UserResponse updateUserByAdmin(Long id, AdminUserUpdateRequest request);
 }
