@@ -1,5 +1,7 @@
 package com.mora.backend.service.impl;
 
+import com.mora.backend.exception.AppException;
+import com.mora.backend.exception.ErrorCode;
 import com.mora.backend.service.StorageService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -57,10 +59,10 @@ public class SupabaseStorageServiceImpl implements StorageService {
 
         } catch (IOException e) {
             log.error("Failed to read bytes from file: {}", originalFilename, e);
-            throw new RuntimeException("Lỗi đọc file tải lên: " + e.getMessage(), e);
+            throw new AppException(ErrorCode.FILE_UPLOAD_FAILED);
         } catch (Exception e) {
             log.error("Failed to upload file to Supabase: {}", originalFilename, e);
-            throw new RuntimeException("Lỗi tải file lên Supabase Storage: " + e.getMessage(), e);
+            throw new AppException(ErrorCode.FILE_UPLOAD_FAILED);
         }
     }
 

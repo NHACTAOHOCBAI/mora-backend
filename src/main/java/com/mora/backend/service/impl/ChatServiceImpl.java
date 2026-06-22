@@ -224,7 +224,7 @@ public class ChatServiceImpl implements ChatService {
             return response;
         } catch (Exception e) {
             log.error("Error occurred while calling Gemini API via Python service", e);
-            throw new RuntimeException("Lỗi kết nối hoặc xử lý từ AI Engine: " + e.getMessage(), e);
+            throw new AppException(ErrorCode.AI_ENGINE_ERROR);
         }
     }
 
@@ -398,7 +398,7 @@ public class ChatServiceImpl implements ChatService {
             return response;
         } catch (Exception e) {
             log.error("Error occurred while calling Gemini API via Python service for space", e);
-            throw new RuntimeException("Lỗi kết nối hoặc xử lý từ AI Engine: " + e.getMessage(), e);
+            throw new AppException(ErrorCode.AI_ENGINE_ERROR);
         }
     }
 

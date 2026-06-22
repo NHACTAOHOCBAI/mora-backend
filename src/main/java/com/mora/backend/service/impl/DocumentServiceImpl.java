@@ -184,7 +184,7 @@ public class DocumentServiceImpl implements DocumentService {
                 } catch (Exception ex) {
                     log.error("Failed to clean up uploaded file from storage after parser failure", ex);
                 }
-                throw new RuntimeException("Lỗi bóc tách nội dung PDF: " + e.getMessage(), e);
+                throw new AppException(ErrorCode.PDF_PROCESSING_FAILED);
             }
         } else {
             // For images, we create a single page that is flagged as having an image
@@ -363,7 +363,7 @@ public class DocumentServiceImpl implements DocumentService {
 
         List<DocumentPage> pages = documentPageRepository.findByDocumentIdOrderByPageNumberAsc(id);
         if (pages.isEmpty()) {
-            throw new RuntimeException("Tài liệu không có nội dung văn bản để phân tích.");
+            throw new AppException(ErrorCode.PDF_PROCESSING_FAILED);
         }
 
         // Tạo context từ toàn bộ các trang tài liệu
@@ -392,7 +392,7 @@ public class DocumentServiceImpl implements DocumentService {
 
         } catch (Exception e) {
             log.error("Failed to generate study notes using Python AI service", e);
-            throw new RuntimeException("Lỗi sinh tóm tắt hoặc flashcard bằng AI: " + e.getMessage(), e);
+            throw new AppException(ErrorCode.AI_ENGINE_ERROR);
         }
 
         return getDocumentById(id);
@@ -451,7 +451,7 @@ public class DocumentServiceImpl implements DocumentService {
                 return ImageUtil.resizeAndCompress(rawImage);
             } catch (IOException e) {
                 log.error("Failed to download image file from storage: {}", document.getStorageUrl(), e);
-                throw new RuntimeException("Không thể tải hình ảnh từ Storage: " + e.getMessage());
+                throw new AppException(ErrorCode.IMAGE_EXTRACTION_FAILED);
             }
         }
 
@@ -467,7 +467,7 @@ public class DocumentServiceImpl implements DocumentService {
             }
         } catch (IOException e) {
             log.error("Failed to render PDF page to image for document ID: {}, page: {}", documentId, pageNumber, e);
-            throw new RuntimeException("Lỗi kết xuất trang PDF sang hình ảnh: " + e.getMessage(), e);
+            throw new AppException(ErrorCode.IMAGE_EXTRACTION_FAILED);
         }
     }
 
@@ -646,7 +646,7 @@ public class DocumentServiceImpl implements DocumentService {
             }
         } catch (IOException e) {
             log.error("Failed to extract image debug details for document ID: {}", id, e);
-            throw new RuntimeException("Lỗi bóc tách ảnh để debug: " + e.getMessage(), e);
+            throw new AppException(ErrorCode.IMAGE_EXTRACTION_FAILED);
         }
 
         return debugList;
@@ -683,9 +683,9 @@ public class DocumentServiceImpl implements DocumentService {
             }
         } catch (IOException e) {
             log.error("Failed to extract image resource '{}' from document ID: {}, page: {}", imageName, documentId, pageNumber, e);
-            throw new RuntimeException("Lỗi trích xuất tài nguyên hình ảnh: " + e.getMessage(), e);
+            throw new AppException(ErrorCode.IMAGE_EXTRACTION_FAILED);
         }
-        throw new RuntimeException("Không tìm thấy hình ảnh này trong tài liệu.");
+        throw new AppException(ErrorCode.IMAGE_RESOURCES_NOT_FOUND);
     }
 
     @Override
@@ -770,7 +770,7 @@ public class DocumentServiceImpl implements DocumentService {
                 }
             } catch (IOException e) {
                 log.error("Failed to re-process document pages for threshold update", e);
-                throw new RuntimeException("Lỗi xử lý tài liệu khi cập nhật ngưỡng: " + e.getMessage(), e);
+                throw new AppException(ErrorCode.PDF_PROCESSING_FAILED);
             }
         }
         

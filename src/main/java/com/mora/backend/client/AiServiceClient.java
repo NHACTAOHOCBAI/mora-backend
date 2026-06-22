@@ -1,5 +1,7 @@
 package com.mora.backend.client;
 
+import com.mora.backend.exception.AppException;
+import com.mora.backend.exception.ErrorCode;
 import com.mora.backend.model.dto.response.DocumentChatResponse;
 import com.mora.backend.model.dto.response.SpaceChatResponse;
 import com.mora.backend.model.dto.request.ChatMessageDto;
@@ -33,10 +35,10 @@ public class AiServiceClient {
             return restTemplate.postForObject(url, request, DocumentChatResponse.class);
         } catch (org.springframework.web.client.HttpStatusCodeException e) {
             log.error("Failed to call Python AI service /api/chat/document. Error response: {}", e.getResponseBodyAsString(), e);
-            throw new RuntimeException("Lỗi từ AI Engine: " + e.getResponseBodyAsString(), e);
+            throw new AppException(ErrorCode.AI_ENGINE_ERROR);
         } catch (Exception e) {
             log.error("Failed to call Python AI service /api/chat/document", e);
-            throw new RuntimeException("Lỗi kết nối tới AI Engine: " + e.getMessage(), e);
+            throw new AppException(ErrorCode.AI_ENGINE_ERROR);
         }
     }
 
@@ -52,10 +54,10 @@ public class AiServiceClient {
             return restTemplate.postForObject(url, request, SpaceChatResponse.class);
         } catch (org.springframework.web.client.HttpStatusCodeException e) {
             log.error("Failed to call Python AI service /api/chat/space. Error response: {}", e.getResponseBodyAsString(), e);
-            throw new RuntimeException("Lỗi từ AI Engine: " + e.getResponseBodyAsString(), e);
+            throw new AppException(ErrorCode.AI_ENGINE_ERROR);
         } catch (Exception e) {
             log.error("Failed to call Python AI service /api/chat/space", e);
-            throw new RuntimeException("Lỗi kết nối tới AI Engine: " + e.getMessage(), e);
+            throw new AppException(ErrorCode.AI_ENGINE_ERROR);
         }
     }
 
@@ -76,10 +78,10 @@ public class AiServiceClient {
             return restTemplate.postForObject(url, request, StudyNotesResponse.class);
         } catch (org.springframework.web.client.HttpStatusCodeException e) {
             log.error("Failed to call Python AI service /api/study/notes. Error response: {}", e.getResponseBodyAsString(), e);
-            throw new RuntimeException("Lỗi từ AI Engine: " + e.getResponseBodyAsString(), e);
+            throw new AppException(ErrorCode.AI_ENGINE_ERROR);
         } catch (Exception e) {
             log.error("Failed to call Python AI service /api/study/notes", e);
-            throw new RuntimeException("Lỗi kết nối tới AI Engine: " + e.getMessage(), e);
+            throw new AppException(ErrorCode.AI_ENGINE_ERROR);
         }
     }
 }

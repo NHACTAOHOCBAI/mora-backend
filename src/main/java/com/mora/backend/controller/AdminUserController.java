@@ -1,6 +1,7 @@
 package com.mora.backend.controller;
 
 import com.mora.backend.model.dto.request.AdminUserUpdateRequest;
+import com.mora.backend.model.dto.response.ApiResponse;
 import com.mora.backend.model.dto.response.UserResponse;
 import com.mora.backend.service.UserService;
 import jakarta.validation.Valid;
@@ -10,8 +11,6 @@ import org.springframework.web.bind.annotation.*;
 
 import com.mora.backend.model.dto.response.PageResponse;
 
-import java.util.List;
-
 @RestController
 @RequestMapping("/api/admin/users")
 @RequiredArgsConstructor
@@ -20,21 +19,33 @@ public class AdminUserController {
     private final UserService userService;
 
     @GetMapping
-    public ResponseEntity<PageResponse<UserResponse>> getAllUsers(
+    public ResponseEntity<ApiResponse<PageResponse<UserResponse>>> getAllUsers(
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "10") int limit,
             @RequestParam(required = false) String search,
             @RequestParam(defaultValue = "id") String sortBy,
             @RequestParam(defaultValue = "ASC") String sortOrder
     ) {
-        return ResponseEntity.ok(userService.getAllUsers(page, limit, search, sortBy, sortOrder));
+        PageResponse<UserResponse> response = userService.getAllUsers(page, limit, search, sortBy, sortOrder);
+        return ResponseEntity.ok(
+                ApiResponse.<PageResponse<UserResponse>>builder()
+                        .message("Lấy danh sách người dùng thành công")
+                        .result(response)
+                        .build()
+        );
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<UserResponse> updateUser(
+    public ResponseEntity<ApiResponse<UserResponse>> updateUser(
             @PathVariable Long id,
             @Valid @RequestBody AdminUserUpdateRequest request
     ) {
-        return ResponseEntity.ok(userService.updateUserByAdmin(id, request));
+        UserResponse response = userService.updateUserByAdmin(id, request);
+        return ResponseEntity.ok(
+                ApiResponse.<UserResponse>builder()
+                        .message("Cập nhật thông tin người dùng thành công")
+                        .result(response)
+                        .build()
+        );
     }
 }

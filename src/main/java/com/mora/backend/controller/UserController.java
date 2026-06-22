@@ -1,5 +1,6 @@
 package com.mora.backend.controller;
 
+import com.mora.backend.model.dto.response.ApiResponse;
 import com.mora.backend.model.dto.response.UserResponse;
 import com.mora.backend.service.UserService;
 import lombok.RequiredArgsConstructor;
@@ -16,7 +17,13 @@ public class UserController {
     private final UserService userService;
 
     @GetMapping("/me")
-    public ResponseEntity<UserResponse> getProfile() {
-        return ResponseEntity.ok(userService.getCurrentUserResponse());
+    public ResponseEntity<ApiResponse<UserResponse>> getProfile() {
+        UserResponse response = userService.getCurrentUserResponse();
+        return ResponseEntity.ok(
+                ApiResponse.<UserResponse>builder()
+                        .message("Lấy thông tin cá nhân thành công")
+                        .result(response)
+                        .build()
+        );
     }
 }

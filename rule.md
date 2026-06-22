@@ -75,49 +75,54 @@ public class UserRegisterRequest {
 ```
 
 ### 2.3. Xử lý Lỗi & Exception (Exception Handling)
-* **Quy tắc:**
+
+- **Quy tắc:**
   1. Sử dụng hệ thống Exception tập trung bằng `@RestControllerAdvice` kết hợp với `@ExceptionHandler`.
   2. Không bắt Exception và trả về một Map hoặc String tự do.
-  3. Định nghĩa định dạng lỗi đầu ra thống nhất (ví dụ: `ErrorCode`, `Message`, `Timestamp`).
-  4. Ném ra các Exception cụ thể (`UserNotFoundException`, `InvalidCredentialException`...) thay vì dùng chung chung `RuntimeException`.
+  3. Định nghĩa định dạng lỗi đầu ra thống nhất (sử dụng cấu trúc `ApiResponse<T>` chung của dự án).
+  4. Tuyệt đối **KHÔNG** ném ra `RuntimeException` chung chung ở tầng logic nghiệp vụ. Hãy ném ra `AppException` kết hợp với các mã lỗi cụ thể được định nghĩa trong enum `ErrorCode` (ví dụ: `AppException(ErrorCode.USER_NOT_FOUND)`, `AppException(ErrorCode.PDF_PROCESSING_FAILED)`).
 
 ```java
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
-    @ExceptionHandler(UserNotFoundException.class)
-    public ResponseEntity<ErrorResponse> handleUserNotFound(UserNotFoundException ex) {
-        ErrorResponse error = new ErrorResponse(
-            HttpStatus.NOT_FOUND.value(),
-            ex.getMessage(),
-            LocalDateTime.now()
-        );
-        return new ResponseEntity<>(error, HttpStatus.NOT_FOUND);
+    @ExceptionHandler(AppException.class)
+    public ResponseEntity<ApiResponse<Object>> handleAppException(AppException ex) {
+        ErrorCode errorCode = ex.getErrorCode();
+        ApiResponse<Object> error = ApiResponse.builder()
+            .code(errorCode.getCode())
+            .message(errorCode.getMessage())
+            .build();
+        return ResponseEntity.status(errorCode.getStatusCode()).body(error);
     }
 }
 ```
 
 ### 2.4. Quản lý Giao dịch (Transaction Management)
-* **Quy tắc:**
+
+- **Quy tắc:**
   1. Sử dụng `@Transactional` của Spring Framework (`org.springframework.transaction.annotation.Transactional`) thay vì thư viện ngoài.
   2. Đặt `@Transactional` ở tầng **Service implementation** (ServiceImpl), tuyệt đối không đặt ở Controller.
   3. Đối với các tác vụ chỉ đọc (Read-Only), luôn đánh dấu `@Transactional(readOnly = true)` để tối ưu hóa hiệu năng kết nối DB.
 
 ### 2.5. Ghi Log (Logging)
-* **Quy tắc:**
+
+- **Quy tắc:**
   1. Sử dụng `@Slf4j` của Lombok để ghi log. Không sử dụng `System.out.println()` hay `System.err.println()`.
   2. Đặt mức độ log phù hợp:
-     * `log.info(...)`: Tiến trình chạy bình thường (e.g. "User registered successfully with ID: {}").
-     * `log.warn(...)`: Cảnh báo (e.g. "Login attempt failed for user: {}").
-     * `log.error(...)`: Lỗi hệ thống nghiêm trọng (luôn kèm Stacktrace).
-     * `log.debug(...)`: Các thông tin chi tiết phục vụ quá trình phát triển.
+     - `log.info(...)`: Tiến trình chạy bình thường (e.g. "User registered successfully with ID: {}").
+     - `log.warn(...)`: Cảnh báo (e.g. "Login attempt failed for user: {}").
+     - `log.error(...)`: Lỗi hệ thống nghiêm trọng (luôn kèm Stacktrace).
+     - `log.debug(...)`: Các thông tin chi tiết phục vụ quá trình phát triển.
 
 ### 2.6. Thiết kế RESTful API
-* Đặt tên endpoint sử dụng danh từ số nhiều (e.g. `/api/users`, `/api/orders`).
-* Sử dụng đúng HTTP Method:
-  * `GET`: Lấy thông tin.
-  * `POST`: Tạo mới tài nguyên.
-  * `PUT`: Cập nhật toàn bộ tài nguyên.
-  * `PATCH`: Cập nhật một phần tài nguyên.
-  * `DELETE`: Xóa tài nguyên.
-* Trả về HTTP Status code chính xác (`200 OK`, `201 Created`, `400 Bad Request`, `401 Unauthorized`, `403 Forbidden`, `404 Not Found`, `500 Internal Server Error`).
+
+- Đặt tên endpoint sử dụng danh từ số nhiều (e.g. `/api/users`, `/api/orders`).
+- **Phản hồi chuẩn (API Wrapping):** Mọi endpoint trả về dữ liệu định dạng JSON đều **bắt buộc** phải bọc dữ liệu trong lớp cấu trúc chung `ApiResponse<T>` để đồng nhất với định dạng phản hồi của hệ thống. Ngoại lệ duy nhất là các endpoint trả về dữ liệu nhị phân trực tiếp (như file raw, luồng byte ảnh trực tiếp).
+- Sử dụng đúng HTTP Method:
+  - `GET`: Lấy thông tin.
+  - `POST`: Tạo mới tài nguyên.
+  - `PUT`: Cập nhật toàn bộ tài nguyên.
+  - `PATCH`: Cập nhật một phần tài nguyên.
+  - `DELETE`: Xóa tài nguyên.
+- Trả về HTTP Status code chính xác (`200 OK`, `201 Created`, `400 Bad Request`, `401 Unauthorized`, `403 Forbidden`, `404 Not Found`, `500 Internal Server Error`).
