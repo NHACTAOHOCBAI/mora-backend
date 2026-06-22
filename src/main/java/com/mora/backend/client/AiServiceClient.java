@@ -84,4 +84,42 @@ public class AiServiceClient {
             throw new AppException(ErrorCode.AI_ENGINE_ERROR);
         }
     }
+
+    public static class PythonEvaluationResponse {
+        public String approachName;
+        public Double faithfulness;
+        public Double answerRelevance;
+        public Double contextPrecision;
+        public Double contextRecall;
+        public Long avgLatencyMs;
+        public List<Detail> details;
+
+        public static class Detail {
+            public String question;
+            public String retrievedContexts;
+            public String generatedAnswer;
+            public Long latencyMs;
+            public Double faithfulness;
+            public Double answerRelevance;
+            public Double contextPrecision;
+            public Double contextRecall;
+        }
+    }
+
+    public PythonEvaluationResponse evaluateBenchmark(String approachName, List<Map<String, String>> dataset) {
+        String url = aiServiceUrl + "/api/benchmark/evaluate";
+        Map<String, Object> request = Map.of(
+                "approach_name", approachName,
+                "dataset", dataset
+        );
+        try {
+            return restTemplate.postForObject(url, request, PythonEvaluationResponse.class);
+        } catch (org.springframework.web.client.HttpStatusCodeException e) {
+            log.error("Failed to call Python AI service /api/benchmark/evaluate. Error response: {}", e.getResponseBodyAsString(), e);
+            throw new AppException(ErrorCode.AI_ENGINE_ERROR);
+        } catch (Exception e) {
+            log.error("Failed to call Python AI service /api/benchmark/evaluate", e);
+            throw new AppException(ErrorCode.AI_ENGINE_ERROR);
+        }
+    }
 }
