@@ -22,7 +22,9 @@ public enum ErrorCode {
     IMAGE_RESOURCES_NOT_FOUND(1014, "Không tìm thấy tài nguyên hình ảnh trong tài liệu", HttpStatus.NOT_FOUND),
     IMAGE_EXTRACTION_FAILED(1015, "Lỗi trích xuất hình ảnh từ tài liệu", HttpStatus.INTERNAL_SERVER_ERROR),
     BENCHMARK_QUESTION_NOT_FOUND(1016, "Không tìm thấy câu hỏi đánh giá", HttpStatus.NOT_FOUND),
-    BENCHMARK_RUN_NOT_FOUND(1017, "Không tìm thấy kết quả đánh giá", HttpStatus.NOT_FOUND)
+    BENCHMARK_RUN_NOT_FOUND(1017, "Không tìm thấy kết quả đánh giá", HttpStatus.NOT_FOUND),
+    OLD_PASSWORD_INCORRECT(1018, "Mật khẩu cũ không chính xác", HttpStatus.BAD_REQUEST),
+    FILE_TOO_LARGE(1019, "Kích thước ảnh đại diện không được vượt quá 5MB", HttpStatus.BAD_REQUEST)
     ;
 
     private final int code;

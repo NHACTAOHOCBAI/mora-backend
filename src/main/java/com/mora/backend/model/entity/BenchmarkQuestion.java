@@ -22,11 +22,9 @@ public class BenchmarkQuestion {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Lob
     @Column(name = "question", nullable = false, columnDefinition = "TEXT")
     private String question;
 
-    @Lob
     @Column(name = "ground_truth", nullable = false, columnDefinition = "TEXT")
     private String groundTruth;
 

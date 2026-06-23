@@ -5,6 +5,8 @@ import com.mora.backend.exception.ErrorCode;
 import com.mora.backend.model.dto.request.AdminUserUpdateRequest;
 import com.mora.backend.model.dto.request.LoginRequest;
 import com.mora.backend.model.dto.request.RegisterRequest;
+import com.mora.backend.model.dto.request.UpdateProfileRequest;
+import com.mora.backend.model.dto.request.ChangePasswordRequest;
 import com.mora.backend.model.dto.response.AuthResponse;
 import com.mora.backend.model.dto.response.UserResponse;
 import com.mora.backend.model.dto.response.PageResponse;
@@ -17,6 +19,7 @@ import com.mora.backend.model.entity.User;
 import com.mora.backend.repository.UserRepository;
 import com.mora.backend.security.JwtTokenProvider;
 import com.mora.backend.service.UserService;
+import com.mora.backend.service.StorageService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -27,6 +30,7 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 import java.util.stream.Collectors;
@@ -40,6 +44,7 @@ public class UserServiceImpl implements UserService {
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenProvider jwtTokenProvider;
     private final AuthenticationManager authenticationManager;
+    private final StorageService storageService;
 
     @Override
     @Transactional
@@ -168,6 +173,57 @@ public class UserServiceImpl implements UserService {
         return mapToUserResponse(user);
     }
 
+    @Override
+    @Transactional
+    public UserResponse updateProfile(UpdateProfileRequest request) {
+        log.info("Updating profile for current user");
+        User user = getCurrentUser();
+        user.setFullName(request.getFullName());
+        user = userRepository.save(user);
+        return mapToUserResponse(user);
+    }
+
+    @Override
+    @Transactional
+    public UserResponse updateAvatar(MultipartFile file) {
+        log.info("Updating avatar for current user");
+        User user = getCurrentUser();
+
+        // 1. Validation size (max 5MB)
+        if (file.getSize() > 5 * 1024 * 1024) {
+            throw new AppException(ErrorCode.FILE_TOO_LARGE);
+        }
+
+        // 2. Validation format (JPG, JPEG, PNG, WEBP)
+        String contentType = file.getContentType();
+        if (contentType == null || 
+            (!contentType.equalsIgnoreCase("image/jpeg") &&
+             !contentType.equalsIgnoreCase("image/jpg") &&
+             !contentType.equalsIgnoreCase("image/png") &&
+             !contentType.equalsIgnoreCase("image/webp"))) {
+            throw new AppException(ErrorCode.INVALID_FILE_FORMAT);
+        }
+
+        String avatarUrl = storageService.upload(file);
+        user.setAvatarUrl(avatarUrl);
+        user = userRepository.save(user);
+        return mapToUserResponse(user);
+    }
+
+    @Override
+    @Transactional
+    public void changePassword(ChangePasswordRequest request) {
+        log.info("Changing password for current user");
+        User user = getCurrentUser();
+
+        if (!passwordEncoder.matches(request.getOldPassword(), user.getPassword())) {
+            throw new AppException(ErrorCode.OLD_PASSWORD_INCORRECT);
+        }
+
+        user.setPassword(passwordEncoder.encode(request.getNewPassword()));
+        userRepository.save(user);
+    }
+
     private UserResponse mapToUserResponse(User user) {
         return UserResponse.builder()
                 .id(user.getId())
@@ -175,6 +231,7 @@ public class UserServiceImpl implements UserService {
                 .email(user.getEmail())
                 .fullName(user.getFullName())
                 .role(user.getRole())
+                .avatarUrl(user.getAvatarUrl())
                 .active(user.isActive())
                 .createdAt(user.getCreatedAt())
                 .updatedAt(user.getUpdatedAt())

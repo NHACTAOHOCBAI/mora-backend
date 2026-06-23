@@ -38,6 +38,9 @@ public class User {
     @Column(name = "role", nullable = false, length = 20)
     private Role role;
 
+    @Column(name = "avatar_url", length = 255)
+    private String avatarUrl;
+
     @Column(name = "active", nullable = false)
     @Builder.Default
     private boolean active = true;
