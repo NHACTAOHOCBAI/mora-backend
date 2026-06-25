@@ -456,8 +456,8 @@ public class DocumentServiceImpl implements DocumentService {
         }
 
         try {
-            java.io.File cachedFile = getCachedPdfFile(documentId, document.getStorageUrl());
-            try (PDDocument pdfDocument = Loader.loadPDF(cachedFile)) {
+            byte[] pdfBytes = downloadFile(document.getStorageUrl());
+            try (PDDocument pdfDocument = Loader.loadPDF(pdfBytes)) {
                 if (pageNumber < 1 || pageNumber > pdfDocument.getNumberOfPages()) {
                     throw new IllegalArgumentException("Số trang không hợp lệ: " + pageNumber);
                 }
@@ -477,19 +477,6 @@ public class DocumentServiceImpl implements DocumentService {
         }
     }
 
-    private java.io.File getCachedPdfFile(Long documentId, String storageUrl) throws IOException {
-        java.io.File tempDir = new java.io.File(System.getProperty("java.io.tmpdir"), "mora-pdf-cache");
-        if (!tempDir.exists()) {
-            tempDir.mkdirs();
-        }
-        java.io.File cachedFile = new java.io.File(tempDir, documentId + ".pdf");
-        if (!cachedFile.exists()) {
-            log.info("Downloading PDF for document ID {} to local cache...", documentId);
-            byte[] pdfBytes = downloadFile(storageUrl);
-            java.nio.file.Files.write(cachedFile.toPath(), pdfBytes);
-        }
-        return cachedFile;
-    }
 
     @Override
     @Transactional(readOnly = true)
@@ -519,8 +506,8 @@ public class DocumentServiceImpl implements DocumentService {
         }
 
         try {
-            java.io.File cachedFile = getCachedPdfFile(id, document.getStorageUrl());
-            try (PDDocument pdfDocument = Loader.loadPDF(cachedFile)) {
+            byte[] pdfBytes = downloadFile(document.getStorageUrl());
+            try (PDDocument pdfDocument = Loader.loadPDF(pdfBytes)) {
                 int pageCount = pdfDocument.getNumberOfPages();
                 
                 // First pass: collect all Tier 1 accepted images with perceptual hashes
@@ -662,8 +649,8 @@ public class DocumentServiceImpl implements DocumentService {
                 });
 
         try {
-            java.io.File cachedFile = getCachedPdfFile(documentId, document.getStorageUrl());
-            try (PDDocument pdfDocument = Loader.loadPDF(cachedFile)) {
+            byte[] pdfBytes = downloadFile(document.getStorageUrl());
+            try (PDDocument pdfDocument = Loader.loadPDF(pdfBytes)) {
                 if (pageNumber < 1 || pageNumber > pdfDocument.getNumberOfPages()) {
                     throw new IllegalArgumentException("Số trang không hợp lệ: " + pageNumber);
                 }
@@ -702,8 +689,8 @@ public class DocumentServiceImpl implements DocumentService {
         // Re-process the document pages to re-detect vector graphics
         if ("pdf".equalsIgnoreCase(document.getFileType())) {
             try {
-                java.io.File cachedFile = getCachedPdfFile(id, document.getStorageUrl());
-                try (PDDocument pdfDocument = Loader.loadPDF(cachedFile)) {
+                byte[] pdfBytes = downloadFile(document.getStorageUrl());
+                try (PDDocument pdfDocument = Loader.loadPDF(pdfBytes)) {
                     int pageCount = pdfDocument.getNumberOfPages();
                     List<DocumentPage> pages = documentPageRepository.findByDocumentIdOrderByPageNumberAsc(id);
                     

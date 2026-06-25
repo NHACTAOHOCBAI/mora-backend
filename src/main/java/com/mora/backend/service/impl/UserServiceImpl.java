@@ -105,7 +105,7 @@ public class UserServiceImpl implements UserService {
                     .build();
         } catch (Exception e) {
             log.warn("Login failed for user: {}. Reason: {}", request.getUsername(), e.getMessage());
-            throw new AppException(ErrorCode.UNAUTHENTICATED);
+            throw new AppException(ErrorCode.BAD_CREDENTIALS);
         }
     }
 

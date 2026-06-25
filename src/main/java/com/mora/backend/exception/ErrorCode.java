@@ -24,7 +24,8 @@ public enum ErrorCode {
     BENCHMARK_QUESTION_NOT_FOUND(1016, "Không tìm thấy câu hỏi đánh giá", HttpStatus.NOT_FOUND),
     BENCHMARK_RUN_NOT_FOUND(1017, "Không tìm thấy kết quả đánh giá", HttpStatus.NOT_FOUND),
     OLD_PASSWORD_INCORRECT(1018, "Mật khẩu cũ không chính xác", HttpStatus.BAD_REQUEST),
-    FILE_TOO_LARGE(1019, "Kích thước ảnh đại diện không được vượt quá 5MB", HttpStatus.BAD_REQUEST)
+    FILE_TOO_LARGE(1019, "Kích thước ảnh đại diện không được vượt quá 5MB", HttpStatus.BAD_REQUEST),
+    BAD_CREDENTIALS(1020, "Tên đăng nhập hoặc mật khẩu không chính xác", HttpStatus.UNAUTHORIZED)
     ;
 
     private final int code;
