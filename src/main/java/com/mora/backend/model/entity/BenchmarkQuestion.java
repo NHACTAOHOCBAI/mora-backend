@@ -28,6 +28,9 @@ public class BenchmarkQuestion {
     @Column(name = "ground_truth", nullable = false, columnDefinition = "TEXT")
     private String groundTruth;
 
+    @Column(name = "document_id")
+    private Long documentId;
+
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;

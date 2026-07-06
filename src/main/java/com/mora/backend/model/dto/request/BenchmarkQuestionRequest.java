@@ -17,4 +17,6 @@ public class BenchmarkQuestionRequest {
 
     @NotBlank(message = "Đáp án chuẩn không được trống")
     private String groundTruth;
+
+    private Long documentId;
 }

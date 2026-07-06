@@ -38,6 +38,9 @@ public class BenchmarkServiceImpl implements BenchmarkService {
     private final BenchmarkRunRepository runRepository;
     private final BenchmarkRunDetailRepository detailRepository;
     private final AiServiceClient aiServiceClient;
+    private final com.mora.backend.repository.DocumentRepository documentRepository;
+    private final com.mora.backend.repository.DocumentPageRepository documentPageRepository;
+    private final com.mora.backend.service.DocumentService documentService;
 
     // --- Benchmark Questions CRUD ---
 
@@ -48,6 +51,7 @@ public class BenchmarkServiceImpl implements BenchmarkService {
         BenchmarkQuestion question = BenchmarkQuestion.builder()
                 .question(request.getQuestion())
                 .groundTruth(request.getGroundTruth())
+                .documentId(request.getDocumentId())
                 .build();
         BenchmarkQuestion saved = questionRepository.save(question);
         return mapToQuestionResponse(saved);
@@ -84,6 +88,7 @@ public class BenchmarkServiceImpl implements BenchmarkService {
                 .orElseThrow(() -> new AppException(ErrorCode.BENCHMARK_QUESTION_NOT_FOUND));
         question.setQuestion(request.getQuestion());
         question.setGroundTruth(request.getGroundTruth());
+        question.setDocumentId(request.getDocumentId());
         BenchmarkQuestion updated = questionRepository.save(question);
         return mapToQuestionResponse(updated);
     }
@@ -110,18 +115,83 @@ public class BenchmarkServiceImpl implements BenchmarkService {
             throw new AppException(ErrorCode.INVALID_KEY); // Or customized error: no questions configured
         }
 
-        // Prepare dataset for Python service
-        List<Map<String, String>> dataset = questions.stream()
-                .map(q -> Map.of(
-                        "question", q.getQuestion(),
-                        "ground_truth", q.getGroundTruth()
-                ))
-                .collect(Collectors.toList());
+        // Prepare dataset for Python service with real answer & contexts
+        List<Map<String, Object>> dataset = new ArrayList<>();
+        for (BenchmarkQuestion q : questions) {
+            String context = "";
+            List<String> base64Images = new ArrayList<>();
+            List<String> retrievedContexts = new ArrayList<>();
+            long start = System.currentTimeMillis();
+
+            if (q.getDocumentId() != null) {
+                var docOpt = documentRepository.findById(q.getDocumentId());
+                if (docOpt.isPresent()) {
+                    var doc = docOpt.get();
+                    List<com.mora.backend.model.entity.DocumentPage> pages = 
+                            documentPageRepository.findByDocumentIdOrderByPageNumberAsc(doc.getId());
+                    
+                    StringBuilder contextBuilder = new StringBuilder();
+                    contextBuilder.append("--- BẮT ĐẦU FILE: ").append(doc.getFileName()).append(" ---\n");
+                    for (var page : pages) {
+                        contextBuilder.append("--- TRANG ").append(page.getPageNumber()).append(" ---\n");
+                        contextBuilder.append(page.getContent()).append("\n\n");
+                        retrievedContexts.add(page.getContent());
+
+                        // Render image if needed
+                        if (Boolean.TRUE.equals(page.getHasImage()) && !"With_Image_Filtering".equals(request.getApproachName()) && !"No_Images".equals(request.getApproachName())) {
+                            try {
+                                byte[] imageBytes = documentService.renderPageImage(doc.getId(), page.getPageNumber());
+                                if (imageBytes != null && imageBytes.length > 0) {
+                                    base64Images.add(java.util.Base64.getEncoder().encodeToString(imageBytes));
+                                }
+                            } catch (Exception e) {
+                                log.warn("Lỗi khi render trang {} làm ảnh cho benchmark", page.getPageNumber(), e);
+                            }
+                        }
+                    }
+                    contextBuilder.append("--- KẾT THÚC FILE: ").append(doc.getFileName()).append(" ---");
+                    context = contextBuilder.toString();
+                }
+            }
+
+            if (context.isEmpty()) {
+                // Fallback to static mock context if no document linked
+                context = "Mora là một nền tảng hỗ trợ học tập thông minh tích hợp trí tuệ nhân tạo (AI).";
+                retrievedContexts.add(context);
+            }
+
+            // Call Gemini via AiServiceClient to generate the real answer
+            String generatedAnswer = "Không thể sinh câu trả lời do lỗi hệ thống AI.";
+            long latencyMs = 0;
+            try {
+                var chatResponse = aiServiceClient.chatWithDocument(context, q.getQuestion(), base64Images, List.of());
+                if (chatResponse != null && chatResponse.getAnswer() != null) {
+                    generatedAnswer = chatResponse.getAnswer();
+                }
+                latencyMs = System.currentTimeMillis() - start;
+            } catch (Exception e) {
+                log.error("Failed to generate real answer for benchmark question: {}", q.getQuestion(), e);
+                latencyMs = System.currentTimeMillis() - start;
+            }
+
+            log.info("Benchmark processing: question='{}'", q.getQuestion());
+            log.info("Retrieved contexts: {}", retrievedContexts);
+            log.info("Generated answer: '{}'", generatedAnswer);
+            log.info("Latency: {} ms", latencyMs);
+
+            dataset.add(Map.of(
+                    "question", q.getQuestion(),
+                    "ground_truth", q.getGroundTruth(),
+                    "generated_answer", generatedAnswer,
+                    "retrieved_contexts", retrievedContexts,
+                    "latency_ms", latencyMs
+            ));
+        }
 
         // Call Python AI Service
         AiServiceClient.PythonEvaluationResponse evalResponse = aiServiceClient.evaluateBenchmark(
                 request.getApproachName(),
-                dataset
+                (List<Map<String, String>>) (List<?>) dataset
         );
 
         // Save Benchmark Run
@@ -209,6 +279,7 @@ public class BenchmarkServiceImpl implements BenchmarkService {
                 .id(q.getId())
                 .question(q.getQuestion())
                 .groundTruth(q.getGroundTruth())
+                .documentId(q.getDocumentId())
                 .createdAt(q.getCreatedAt())
                 .updatedAt(q.getUpdatedAt())
                 .build();

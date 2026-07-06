@@ -15,6 +15,7 @@ public class BenchmarkQuestionResponse {
     private Long id;
     private String question;
     private String groundTruth;
+    private Long documentId;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }
