@@ -63,9 +63,14 @@ com.mora.backend
     *   **Trình gỡ lỗi Prompt (Prompt Debugger):** Lưu vết toàn bộ nội dung prompt chính xác gửi đi vào cơ sở dữ liệu (`prompt_sent`). Hỗ trợ hiển thị trực quan prompt gốc kèm hình ảnh trong hộp thoại trên Frontend.
     *   **Công cụ học tập thông minh (Study Helper):** Tạo bản Tóm tắt (Summary) học thuật và bộ flashcards thông qua Python AI Service.
     *   **Xử lý lưu trữ bền bỉ (Robust Delete):** Cơ chế xóa file thông minh, tự động dọn dẹp sạch sẽ tài liệu và các trang liên quan trong cơ sở dữ liệu.
-3.  **Lưu trữ Lịch sử Trò chuyện:**
-    *   Tự động lưu lại các tin nhắn trao đổi (User & Assistant) vào DB PostgreSQL.
-    *   Cung cấp các API REST để lấy lịch sử cuộc trò chuyện và dọn dẹp (xóa) lịch sử trò chuyện của từng tài liệu/Space.
+3.  **Bảo mật & Phân quyền (Security & JWT):**
+    *   Tích hợp **Spring Security** với cơ chế xác thực không lưu trạng thái (Stateless) sử dụng **JWT Token**.
+    *   Phân chia vai trò rõ ràng: Người dùng thường (`ROLE_USER`) và Quản trị viên (`ROLE_ADMIN`).
+    *   Khởi tạo tự động tài khoản Admin mặc định thông qua database seeder (`DatabaseSeeder.java`).
+4.  **Đánh Giá Chất Lượng RAG (Ragas Benchmark):**
+    *   **Golden Dataset:** Quản lý tập câu hỏi chuẩn gồm các câu hỏi và đáp án mẫu (Ground Truth).
+    *   **Đánh giá tự động bằng Ragas:** Chạy đánh giá RAG dựa trên các chỉ số nâng cao (Faithfulness, Answer Relevance, Context Precision, Context Recall) bằng cách phối hợp với AI Service.
+    *   **So sánh hiệu năng:** Giao diện so sánh trực quan hiệu năng giữa các lần chạy thử nghiệm khác nhau dưới dạng biểu đồ cột và bảng so sánh ngữ cảnh/câu trả lời chi tiết cho từng câu hỏi.
 
 ---
 
@@ -75,6 +80,11 @@ Sau khi khởi chạy ứng dụng thành công, tài liệu Swagger UI sẽ kh�
 👉 **[http://localhost:8080/swagger-ui.html](http://localhost:8080/swagger-ui.html)**
 
 ### Các Endpoint chính:
+*   `POST /api/auth/register` - Đăng ký tài khoản mới.
+*   `POST /api/auth/login` - Đăng nhập hệ thống nhận JWT Token.
+*   `GET /api/users/me` - Lấy thông tin tài khoản hiện tại.
+*   `PUT /api/users/profile` - Cập nhật thông tin cá nhân.
+*   `PUT /api/users/profile/password` - Thay đổi mật khẩu.
 *   `POST /api/documents/upload` - Tải lên file PDF và bóc tách nội dung từng trang.
 *   `GET /api/documents/{id}` - Lấy thông tin chi tiết tài liệu kèm các trang.
 *   `DELETE /api/documents/{id}` - Xóa tài liệu khỏi hệ thống.
@@ -89,6 +99,14 @@ Sau khi khởi chạy ứng dụng thành công, tài liệu Swagger UI sẽ kh�
 *   `GET /api/chat/space/{spaceId}` - Lấy lịch sử chat của Space.
 *   `DELETE /api/chat/document/{documentId}` - Xóa lịch sử chat của tài liệu.
 *   `DELETE /api/chat/space/{spaceId}` - Xóa lịch sử chat của Space.
+*   `POST /api/admin/benchmarks/questions` - Tạo câu hỏi kiểm thử mới.
+*   `GET /api/admin/benchmarks/questions` - Danh sách câu hỏi kiểm thử.
+*   `PUT /api/admin/benchmarks/questions/{id}` - Sửa câu hỏi kiểm thử.
+*   `DELETE /api/admin/benchmarks/questions/{id}` - Xóa câu hỏi kiểm thử.
+*   `POST /api/admin/benchmarks/run` - Thực thi lượt chạy đánh giá Ragas Benchmark.
+*   `GET /api/admin/benchmarks/runs` - Lấy danh sách lịch sử các lượt chạy.
+*   `GET /api/admin/benchmarks/runs/{id}` - Chi tiết lượt chạy kèm điểm số của từng câu hỏi.
+*   `DELETE /api/admin/benchmarks/runs/{id}` - Xóa lượt chạy đánh giá.
 
 ---
 
