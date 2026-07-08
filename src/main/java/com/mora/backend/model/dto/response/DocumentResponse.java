@@ -6,17 +6,17 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
-import java.util.List;
 
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class SpaceDetailResponse {
+public class DocumentResponse {
     private Long id;
     private String name;
-    private String description;
+    private String storageUrl;
+    private Long fileSize;
+    private String contentType;
+    private Long spaceId;
     private LocalDateTime createdAt;
-    private LocalDateTime updatedAt;
-    private List<DocumentResponse> documents;
 }

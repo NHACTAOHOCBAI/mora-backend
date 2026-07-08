@@ -18,6 +18,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import com.mora.backend.model.dto.response.DocumentResponse;
+import com.mora.backend.model.entity.Document;
+import com.mora.backend.repository.DocumentRepository;
+import com.mora.backend.service.DocumentService;
+
 
 @Service
 @RequiredArgsConstructor
@@ -27,6 +32,9 @@ public class SpaceServiceImpl implements SpaceService {
     private final SpaceRepository spaceRepository;
     private final ChatMessageRepository chatMessageRepository;
     private final UserService userService;
+    private final DocumentRepository documentRepository;
+    private final DocumentService documentService;
+
 
     @Override
     @Transactional
@@ -73,12 +81,26 @@ public class SpaceServiceImpl implements SpaceService {
             throw new AppException(ErrorCode.UNAUTHORIZED);
         }
 
+        List<Document> documents = documentRepository.findBySpaceId(id);
+        List<DocumentResponse> docResponses = documents.stream()
+                .map(d -> DocumentResponse.builder()
+                        .id(d.getId())
+                        .name(d.getName())
+                        .storageUrl(d.getStorageUrl())
+                        .fileSize(d.getFileSize())
+                        .contentType(d.getContentType())
+                        .spaceId(d.getSpace().getId())
+                        .createdAt(d.getCreatedAt())
+                        .build())
+                .toList();
+
         return SpaceDetailResponse.builder()
                 .id(space.getId())
                 .name(space.getName())
                 .description(space.getDescription())
                 .createdAt(space.getCreatedAt())
                 .updatedAt(space.getUpdatedAt())
+                .documents(docResponses)
                 .build();
     }
 
@@ -100,7 +122,13 @@ public class SpaceServiceImpl implements SpaceService {
         // 1. Delete space-level chat messages
         chatMessageRepository.deleteBySpaceId(id);
 
-        // 2. Delete the space itself
+        // 2. Delete all documents in this space
+        List<Document> documents = documentRepository.findBySpaceId(id);
+        for (Document doc : documents) {
+            documentService.deleteDocument(doc.getId());
+        }
+
+        // 3. Delete the space itself
         spaceRepository.delete(space);
     }
 

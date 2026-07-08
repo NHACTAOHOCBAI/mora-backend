@@ -24,13 +24,25 @@ public class ChatMessage {
     @Column(name = "sender", nullable = false)
     private String sender; // "user" hoặc "assistant"
 
-    @Lob
     @Column(name = "text", nullable = false, columnDefinition = "TEXT")
     private String text;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "space_id")
     private Space space;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "document_id")
+    private Document document;
+
+    @Column(name = "condensed_question", columnDefinition = "TEXT")
+    private String condensedQuestion;
+
+    @Column(name = "prompt_sent", columnDefinition = "TEXT")
+    private String promptSent;
+
+    @Column(name = "citations", columnDefinition = "TEXT")
+    private String citations; // JSON string chứa danh sách Citation
 
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)

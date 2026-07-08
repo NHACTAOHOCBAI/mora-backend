@@ -1,5 +1,8 @@
 package com.mora.backend.service.impl;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.mora.backend.client.AiServiceClient;
 import com.mora.backend.exception.AppException;
 import com.mora.backend.exception.ErrorCode;
 import com.mora.backend.model.dto.request.SpaceChatRequest;
@@ -7,14 +10,20 @@ import com.mora.backend.model.dto.response.SpaceChatResponse;
 import com.mora.backend.model.dto.response.ChatMessageResponse;
 import com.mora.backend.model.entity.Space;
 import com.mora.backend.model.entity.ChatMessage;
+import com.mora.backend.model.entity.Document;
+import com.mora.backend.model.entity.DocumentPage;
 import com.mora.backend.repository.SpaceRepository;
 import com.mora.backend.repository.ChatMessageRepository;
+import com.mora.backend.repository.DocumentRepository;
+import com.mora.backend.repository.DocumentPageRepository;
 import com.mora.backend.service.ChatService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 @Service
@@ -24,6 +33,10 @@ public class ChatServiceImpl implements ChatService {
 
     private final SpaceRepository spaceRepository;
     private final ChatMessageRepository chatMessageRepository;
+    private final DocumentRepository documentRepository;
+    private final DocumentPageRepository documentPageRepository;
+    private final AiServiceClient aiServiceClient;
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Override
     @Transactional
@@ -35,7 +48,36 @@ public class ChatServiceImpl implements ChatService {
                     return new AppException(ErrorCode.SPACE_NOT_FOUND);
                 });
 
-        // 2. Lưu tin nhắn User gửi vào DB
+        // 2. Lấy danh sách tài liệu và nội dung text các trang
+        List<Document> documents = documentRepository.findBySpaceId(request.getSpaceId());
+        List<AiServiceClient.PythonChatRequest.ContextItem> contextItems = new ArrayList<>();
+        
+        for (Document doc : documents) {
+            List<DocumentPage> pages = documentPageRepository.findByDocumentIdOrderByPageNumberAsc(doc.getId());
+            for (DocumentPage page : pages) {
+                AiServiceClient.PythonChatRequest.ContextItem item = new AiServiceClient.PythonChatRequest.ContextItem();
+                item.pageNumber = page.getPageNumber();
+                item.text = page.getText();
+                item.documentId = doc.getId();
+                item.documentName = doc.getName();
+                contextItems.add(item);
+            }
+        }
+
+        // 3. Lấy lịch sử hội thoại được gửi lên từ Request
+        List<AiServiceClient.PythonChatRequest.HistoryItem> historyItems = new ArrayList<>();
+        if (request.getHistory() != null) {
+            historyItems = request.getHistory().stream()
+                    .map(h -> {
+                        AiServiceClient.PythonChatRequest.HistoryItem item = new AiServiceClient.PythonChatRequest.HistoryItem();
+                        item.sender = h.getSender();
+                        item.text = h.getText();
+                        return item;
+                    })
+                    .toList();
+        }
+
+        // 4. Lưu tin nhắn của User vào DB trước
         ChatMessage userMessage = ChatMessage.builder()
                 .sender("user")
                 .text(request.getQuestion())
@@ -43,23 +85,51 @@ public class ChatServiceImpl implements ChatService {
                 .build();
         chatMessageRepository.save(userMessage);
 
-        // 3. Tạo phản hồi mô phỏng (Mock Response)
-        String mockAnswer = "Đây là phản hồi tự động từ hệ thống (vỏ rỗng chatbot). Bạn đã hỏi: " + request.getQuestion();
-        
-        // 4. Lưu phản hồi của Assistant vào DB
+        // 5. Gọi Python AI Service
+        AiServiceClient.PythonChatRequest pythonRequest = new AiServiceClient.PythonChatRequest();
+        pythonRequest.question = request.getQuestion();
+        pythonRequest.context = contextItems;
+        pythonRequest.history = historyItems;
+
+        AiServiceClient.PythonChatResponse pythonResponse = aiServiceClient.callChat(pythonRequest);
+
+        // 6. Lưu phản hồi của Assistant kèm Citations JSON
+        String citationsJson = "";
+        try {
+            citationsJson = objectMapper.writeValueAsString(pythonResponse.citations);
+        } catch (Exception e) {
+            log.error("Failed to serialize citations", e);
+        }
+
         ChatMessage assistantMessage = ChatMessage.builder()
                 .sender("assistant")
-                .text(mockAnswer)
+                .text(pythonResponse.answer)
                 .space(space)
+                .condensedQuestion(pythonResponse.condensedQuestion)
+                .promptSent(pythonResponse.promptSent)
+                .citations(citationsJson)
                 .build();
         chatMessageRepository.save(assistantMessage);
 
+        // 7. Chuyển đổi Citations sang định dạng Response DTO
+        List<SpaceChatResponse.SpaceCitation> responseCitations = new ArrayList<>();
+        if (pythonResponse.citations != null) {
+            responseCitations = pythonResponse.citations.stream()
+                    .map(c -> SpaceChatResponse.SpaceCitation.builder()
+                            .quote(c.quote)
+                            .documentId(c.documentId)
+                            .documentName(c.documentName)
+                            .pageNumber(c.pageNumber)
+                            .build())
+                    .toList();
+        }
+
         return SpaceChatResponse.builder()
                 .answerFound(true)
-                .answer(mockAnswer)
-                .citations(List.of())
-                .condensedQuestion(request.getQuestion())
-                .promptSent("[MOCK PROMPT] - System prompt and AI services have been removed.")
+                .answer(pythonResponse.answer)
+                .citations(responseCitations)
+                .condensedQuestion(pythonResponse.condensedQuestion)
+                .promptSent(pythonResponse.promptSent)
                 .build();
     }
 
@@ -77,11 +147,34 @@ public class ChatServiceImpl implements ChatService {
     }
 
     private ChatMessageResponse mapToResponse(ChatMessage msg) {
+        List<SpaceChatResponse.SpaceCitation> responseCitations = new ArrayList<>();
+        if (msg.getCitations() != null && !msg.getCitations().isBlank()) {
+            try {
+                List<AiServiceClient.PythonChatResponse.Citation> citations = objectMapper.readValue(
+                        msg.getCitations(),
+                        new TypeReference<List<AiServiceClient.PythonChatResponse.Citation>>() {}
+                );
+                responseCitations = citations.stream()
+                        .map(c -> SpaceChatResponse.SpaceCitation.builder()
+                                .quote(c.quote)
+                                .documentId(c.documentId)
+                                .documentName(c.documentName)
+                                .pageNumber(c.pageNumber)
+                                .build())
+                        .toList();
+            } catch (Exception e) {
+                log.error("Failed to deserialize citations from database for message ID: {}", msg.getId(), e);
+            }
+        }
+
         return ChatMessageResponse.builder()
                 .id(msg.getId())
                 .sender(msg.getSender())
                 .text(msg.getText())
                 .timestamp(msg.getCreatedAt())
+                .condensedQuestion(msg.getCondensedQuestion())
+                .promptSent(msg.getPromptSent())
+                .citations(responseCitations)
                 .build();
     }
 }

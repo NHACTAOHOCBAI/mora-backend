@@ -69,4 +69,49 @@ public class AiServiceClient {
             throw new AppException(ErrorCode.AI_ENGINE_ERROR);
         }
     }
+
+    public static class PythonChatRequest {
+        public String question;
+        public List<ContextItem> context;
+        public List<HistoryItem> history;
+
+        public static class ContextItem {
+            public int pageNumber;
+            public String text;
+            public String documentName;
+            public Long documentId;
+        }
+
+        public static class HistoryItem {
+            public String sender;
+            public String text;
+        }
+    }
+
+    public static class PythonChatResponse {
+        public String answer;
+        public List<Citation> citations;
+        public String condensedQuestion;
+        public String promptSent;
+
+        public static class Citation {
+            public int pageNumber;
+            public String quote;
+            public Long documentId;
+            public String documentName;
+        }
+    }
+
+    public PythonChatResponse callChat(PythonChatRequest request) {
+        String url = aiServiceUrl + "/api/chat";
+        try {
+            return restTemplate.postForObject(url, request, PythonChatResponse.class);
+        } catch (org.springframework.web.client.HttpStatusCodeException e) {
+            log.error("Failed to call Python AI service /api/chat. Error response: {}", e.getResponseBodyAsString(), e);
+            throw new AppException(ErrorCode.AI_ENGINE_ERROR);
+        } catch (Exception e) {
+            log.error("Failed to call Python AI service /api/chat", e);
+            throw new AppException(ErrorCode.AI_ENGINE_ERROR);
+        }
+    }
 }
