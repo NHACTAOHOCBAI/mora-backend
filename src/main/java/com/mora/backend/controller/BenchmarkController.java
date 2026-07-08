@@ -75,4 +75,17 @@ public class BenchmarkController {
                         .build()
         );
     }
+
+    @PostMapping("/history/bulk-delete")
+    @Operation(summary = "Xóa hàng loạt lịch sử lượt chạy benchmark")
+    public ResponseEntity<ApiResponse<Void>> bulkDeleteRuns(@RequestBody List<Long> ids) {
+        for (Long id : ids) {
+            benchmarkService.deleteRun(id);
+        }
+        return ResponseEntity.ok(
+                ApiResponse.<Void>builder()
+                        .message("Xóa hàng loạt lượt benchmark thành công")
+                        .build()
+        );
+    }
 }
