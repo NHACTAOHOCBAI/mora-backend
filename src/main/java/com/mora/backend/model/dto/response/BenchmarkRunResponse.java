@@ -32,6 +32,7 @@ public class BenchmarkRunResponse {
         private String question;
         private String retrievedContexts;
         private String generatedAnswer;
+        private String groundTruth;
         private Long latencyMs;
         private Double faithfulness;
         private Double answerRelevance;

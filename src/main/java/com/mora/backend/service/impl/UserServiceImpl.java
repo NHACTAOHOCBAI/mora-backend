@@ -16,7 +16,9 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import com.mora.backend.model.entity.Role;
 import com.mora.backend.model.entity.User;
+import com.mora.backend.model.entity.Space;
 import com.mora.backend.repository.UserRepository;
+import com.mora.backend.repository.SpaceRepository;
 import com.mora.backend.security.JwtTokenProvider;
 import com.mora.backend.service.UserService;
 import com.mora.backend.service.StorageService;
@@ -45,6 +47,7 @@ public class UserServiceImpl implements UserService {
     private final JwtTokenProvider jwtTokenProvider;
     private final AuthenticationManager authenticationManager;
     private final StorageService storageService;
+    private final SpaceRepository spaceRepository;
 
     @Override
     @Transactional
@@ -222,6 +225,21 @@ public class UserServiceImpl implements UserService {
 
         user.setPassword(passwordEncoder.encode(request.getNewPassword()));
         userRepository.save(user);
+    }
+
+    @Override
+    @Transactional
+    public void deleteUser(Long id) {
+        log.info("Deleting user ID: {}", id);
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+
+        // Delete all spaces created by this user first
+        List<Space> spaces = spaceRepository.findByUser(user);
+        spaceRepository.deleteAll(spaces);
+
+        // Delete the user itself
+        userRepository.delete(user);
     }
 
     private UserResponse mapToUserResponse(User user) {

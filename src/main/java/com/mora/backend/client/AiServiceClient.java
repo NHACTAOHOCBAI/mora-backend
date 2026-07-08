@@ -12,6 +12,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
 import java.util.List;
 import java.util.Map;
+import com.fasterxml.jackson.annotation.JsonProperty;
 
 @Component
 @Slf4j
@@ -96,8 +97,11 @@ public class AiServiceClient {
 
         public static class Detail {
             public String question;
+            @JsonProperty("retrieved_contexts")
             public String retrievedContexts;
+            @JsonProperty("generated_answer")
             public String generatedAnswer;
+            public String groundTruth;
             public Long latencyMs;
             public Double faithfulness;
             public Double answerRelevance;
@@ -113,7 +117,14 @@ public class AiServiceClient {
                 "dataset", dataset
         );
         try {
-            return restTemplate.postForObject(url, request, PythonEvaluationResponse.class);
+            PythonEvaluationResponse response = restTemplate.postForObject(url, request, PythonEvaluationResponse.class);
+            if (response != null && response.details != null) {
+                for (var d : response.details) {
+                    log.info("Python evaluation detail: question='{}', generatedAnswer='{}', retrievedContexts='{}', groundTruth='{}'", 
+                            d.question, d.generatedAnswer, d.retrievedContexts, d.groundTruth);
+                }
+            }
+            return response;
         } catch (org.springframework.web.client.HttpStatusCodeException e) {
             log.error("Failed to call Python AI service /api/benchmark/evaluate. Error response: {}", e.getResponseBodyAsString(), e);
             throw new AppException(ErrorCode.AI_ENGINE_ERROR);

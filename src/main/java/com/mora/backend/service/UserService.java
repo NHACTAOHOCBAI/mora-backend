@@ -20,6 +20,7 @@ public interface UserService {
     UserResponse getCurrentUserResponse();
     PageResponse<UserResponse> getAllUsers(int page, int limit, String search, String sortBy, String sortOrder);
     UserResponse updateUserByAdmin(Long id, AdminUserUpdateRequest request);
+    void deleteUser(Long id);
     UserResponse updateProfile(UpdateProfileRequest request);
     UserResponse updateAvatar(MultipartFile file);
     void changePassword(ChangePasswordRequest request);

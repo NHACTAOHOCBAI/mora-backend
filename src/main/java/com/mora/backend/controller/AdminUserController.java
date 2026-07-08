@@ -48,4 +48,14 @@ public class AdminUserController {
                         .build()
         );
     }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<ApiResponse<Void>> deleteUser(@PathVariable Long id) {
+        userService.deleteUser(id);
+        return ResponseEntity.ok(
+                ApiResponse.<Void>builder()
+                        .message("Xóa người dùng thành công")
+                        .build()
+        );
+    }
 }

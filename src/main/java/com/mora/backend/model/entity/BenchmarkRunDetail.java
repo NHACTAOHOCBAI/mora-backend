@@ -36,6 +36,10 @@ public class BenchmarkRunDetail {
     @Column(name = "generated_answer", columnDefinition = "TEXT")
     private String generatedAnswer;
 
+    @Lob
+    @Column(name = "ground_truth", columnDefinition = "TEXT")
+    private String groundTruth;
+
     @Column(name = "latency_ms")
     private Long latencyMs;
 
