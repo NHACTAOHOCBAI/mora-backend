@@ -6,7 +6,6 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
-import java.util.List;
 
 @Data
 @Builder
@@ -17,18 +16,4 @@ public class ChatMessageResponse {
     private String sender;
     private String text;
     private LocalDateTime timestamp;
-    private List<Citation> citations;
-    private String condensedQuestion;
-    private String promptSent;
-
-    @Data
-    @Builder
-    @NoArgsConstructor
-    @AllArgsConstructor
-    public static class Citation {
-        private String quote;
-        private Long documentId;
-        private String documentName;
-        private Integer pageNumber;
-    }
 }

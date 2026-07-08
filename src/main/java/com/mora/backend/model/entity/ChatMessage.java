@@ -29,23 +29,8 @@ public class ChatMessage {
     private String text;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "document_id")
-    private Document document;
-
-    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "space_id")
     private Space space;
-
-    @Lob
-    @Column(name = "citations", columnDefinition = "TEXT")
-    private String citations; // JSON string chứa danh sách trích dẫn
-
-    @Column(name = "condensed_question", length = 1024)
-    private String condensedQuestion;
-
-    @Lob
-    @Column(name = "prompt_sent", columnDefinition = "TEXT")
-    private String promptSent;
 
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)

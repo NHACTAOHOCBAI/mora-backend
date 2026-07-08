@@ -9,11 +9,7 @@ import java.util.List;
 @Repository
 public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long> {
 
-    List<ChatMessage> findByDocumentIdOrderByCreatedAtAsc(Long documentId);
+    List<ChatMessage> findBySpaceIdOrderByCreatedAtAsc(Long spaceId);
 
-    List<ChatMessage> findBySpaceIdAndDocumentIsNullOrderByCreatedAtAsc(Long spaceId);
-
-    void deleteByDocumentId(Long documentId);
-
-    void deleteBySpaceIdAndDocumentIsNull(Long spaceId);
+    void deleteBySpaceId(Long spaceId);
 }

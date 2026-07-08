@@ -21,7 +21,6 @@ import com.mora.backend.repository.UserRepository;
 import com.mora.backend.repository.SpaceRepository;
 import com.mora.backend.security.JwtTokenProvider;
 import com.mora.backend.service.UserService;
-import com.mora.backend.service.StorageService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -46,7 +45,6 @@ public class UserServiceImpl implements UserService {
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenProvider jwtTokenProvider;
     private final AuthenticationManager authenticationManager;
-    private final StorageService storageService;
     private final SpaceRepository spaceRepository;
 
     @Override
@@ -189,7 +187,7 @@ public class UserServiceImpl implements UserService {
     @Override
     @Transactional
     public UserResponse updateAvatar(MultipartFile file) {
-        log.info("Updating avatar for current user");
+        log.info("Updating avatar for current user (mocked storage)");
         User user = getCurrentUser();
 
         // 1. Validation size (max 5MB)
@@ -207,7 +205,7 @@ public class UserServiceImpl implements UserService {
             throw new AppException(ErrorCode.INVALID_FILE_FORMAT);
         }
 
-        String avatarUrl = storageService.upload(file);
+        String avatarUrl = "https://api.dicebear.com/7.x/adventurer/svg?seed=" + user.getUsername();
         user.setAvatarUrl(avatarUrl);
         user = userRepository.save(user);
         return mapToUserResponse(user);

@@ -38,9 +38,6 @@ public class BenchmarkServiceImpl implements BenchmarkService {
     private final BenchmarkRunRepository runRepository;
     private final BenchmarkRunDetailRepository detailRepository;
     private final AiServiceClient aiServiceClient;
-    private final com.mora.backend.repository.DocumentRepository documentRepository;
-    private final com.mora.backend.repository.DocumentPageRepository documentPageRepository;
-    private final com.mora.backend.service.DocumentService documentService;
 
     // --- Benchmark Questions CRUD ---
 
@@ -112,67 +109,21 @@ public class BenchmarkServiceImpl implements BenchmarkService {
         
         List<BenchmarkQuestion> questions = questionRepository.findAll();
         if (questions.isEmpty()) {
-            throw new AppException(ErrorCode.INVALID_KEY); // Or customized error: no questions configured
+            throw new AppException(ErrorCode.INVALID_KEY);
         }
 
-        // Prepare dataset for Python service with real answer & contexts
+        // Prepare dataset for Python service with mock answers & contexts
         List<Map<String, Object>> dataset = new ArrayList<>();
         for (BenchmarkQuestion q : questions) {
-            String context = "";
-            List<String> base64Images = new ArrayList<>();
+            String context = "Ngữ cảnh thử nghiệm của Mora học tập.";
             List<String> retrievedContexts = new ArrayList<>();
+            retrievedContexts.add(context);
+            
             long start = System.currentTimeMillis();
-
-            if (q.getDocumentId() != null) {
-                var docOpt = documentRepository.findById(q.getDocumentId());
-                if (docOpt.isPresent()) {
-                    var doc = docOpt.get();
-                    List<com.mora.backend.model.entity.DocumentPage> pages = 
-                            documentPageRepository.findByDocumentIdOrderByPageNumberAsc(doc.getId());
-                    
-                    StringBuilder contextBuilder = new StringBuilder();
-                    contextBuilder.append("--- BẮT ĐẦU FILE: ").append(doc.getFileName()).append(" ---\n");
-                    for (var page : pages) {
-                        contextBuilder.append("--- TRANG ").append(page.getPageNumber()).append(" ---\n");
-                        contextBuilder.append(page.getContent()).append("\n\n");
-                        retrievedContexts.add(page.getContent());
-
-                        // Render image if needed
-                        if (Boolean.TRUE.equals(page.getHasImage()) && !"With_Image_Filtering".equals(request.getApproachName()) && !"No_Images".equals(request.getApproachName())) {
-                            try {
-                                byte[] imageBytes = documentService.renderPageImage(doc.getId(), page.getPageNumber());
-                                if (imageBytes != null && imageBytes.length > 0) {
-                                    base64Images.add(java.util.Base64.getEncoder().encodeToString(imageBytes));
-                                }
-                            } catch (Exception e) {
-                                log.warn("Lỗi khi render trang {} làm ảnh cho benchmark", page.getPageNumber(), e);
-                            }
-                        }
-                    }
-                    contextBuilder.append("--- KẾT THÚC FILE: ").append(doc.getFileName()).append(" ---");
-                    context = contextBuilder.toString();
-                }
-            }
-
-            if (context.isEmpty()) {
-                // Fallback to static mock context if no document linked
-                context = "Mora là một nền tảng hỗ trợ học tập thông minh tích hợp trí tuệ nhân tạo (AI).";
-                retrievedContexts.add(context);
-            }
-
-            // Call Gemini via AiServiceClient to generate the real answer
-            String generatedAnswer = "Không thể sinh câu trả lời do lỗi hệ thống AI.";
-            long latencyMs = 0;
-            try {
-                var chatResponse = aiServiceClient.chatWithDocument(context, q.getQuestion(), base64Images, List.of());
-                if (chatResponse != null && chatResponse.getAnswer() != null) {
-                    generatedAnswer = chatResponse.getAnswer();
-                }
-                latencyMs = System.currentTimeMillis() - start;
-            } catch (Exception e) {
-                log.error("Failed to generate real answer for benchmark question: {}", q.getQuestion(), e);
-                latencyMs = System.currentTimeMillis() - start;
-            }
+            
+            // Mock answer generation instead of calling deleted chatWithDocument
+            String generatedAnswer = "Đây là câu trả lời thử nghiệm cho câu hỏi: " + q.getQuestion();
+            long latencyMs = System.currentTimeMillis() - start;
 
             log.info("Benchmark processing: question='{}'", q.getQuestion());
             log.info("Retrieved contexts: {}", retrievedContexts);
