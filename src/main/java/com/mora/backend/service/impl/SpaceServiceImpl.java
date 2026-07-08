@@ -119,7 +119,7 @@ public class SpaceServiceImpl implements SpaceService {
             throw new AppException(ErrorCode.UNAUTHORIZED);
         }
 
-        // 1. Delete all documents in this space (this deletes physical files on Supabase storage and associated chat messages/pages)
+        // 1. Delete all documents in this space (this deletes physical files on Cloudflare R2 storage and associated chat messages/pages)
         List<Long> documentIds = space.getDocuments().stream()
                 .map(com.mora.backend.model.entity.Document::getId)
                 .toList();

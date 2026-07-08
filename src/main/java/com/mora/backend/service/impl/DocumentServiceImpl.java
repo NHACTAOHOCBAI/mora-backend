@@ -74,7 +74,7 @@ public class DocumentServiceImpl implements DocumentService {
             throw new AppException(ErrorCode.INVALID_FILE_FORMAT);
         }
 
-        // 1. Upload to Supabase Storage
+        // 1. Upload to Cloudflare R2 Storage
         String storageUrl;
         try {
             storageUrl = storageService.upload(file);
@@ -329,15 +329,15 @@ public class DocumentServiceImpl implements DocumentService {
                     return new AppException(ErrorCode.DOCUMENT_NOT_FOUND);
                 });
 
-        // Extract file name from Supabase storage URL (the text after the last '/')
+        // Extract file name from Cloudflare R2 storage URL (the text after the last '/')
         String storageUrl = document.getStorageUrl();
         String fileName = storageUrl.substring(storageUrl.lastIndexOf("/") + 1);
 
-        // 1. Delete file on Supabase Storage
+        // 1. Delete file on Cloudflare R2 Storage
         try {
             storageService.delete(fileName);
         } catch (Exception e) {
-            log.error("Failed to delete file '{}' from Supabase storage during document deletion", fileName, e);
+            log.error("Failed to delete file '{}' from Cloudflare R2 storage during document deletion", fileName, e);
         }
 
         // 2. Delete associated chat messages
