@@ -3,14 +3,19 @@ package com.mora.backend.controller;
 import com.mora.backend.model.dto.request.SpaceChatRequest;
 import com.mora.backend.model.dto.response.ApiResponse;
 import com.mora.backend.model.dto.response.SpaceChatResponse;
+import com.mora.backend.model.dto.response.AsyncChatResponse;
 import com.mora.backend.model.dto.response.ChatMessageResponse;
 import com.mora.backend.service.ChatService;
+import com.mora.backend.service.SseService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.util.List;
 
@@ -21,6 +26,25 @@ import java.util.List;
 public class ChatController {
 
     private final ChatService chatService;
+    private final SseService sseService;
+
+    @PostMapping("/space/async")
+    @Operation(summary = "Hỏi đáp bất đồng bộ với không gian học tập (Event-driven)")
+    public ResponseEntity<ApiResponse<AsyncChatResponse>> chatWithSpaceAsync(@Valid @RequestBody SpaceChatRequest request) {
+        AsyncChatResponse response = chatService.chatWithSpaceAsync(request);
+        return ResponseEntity.status(HttpStatus.ACCEPTED).body(
+                ApiResponse.<AsyncChatResponse>builder()
+                        .message("Yêu cầu hỏi đáp đã được tiếp nhận và đang xử lý")
+                        .result(response)
+                        .build()
+        );
+    }
+
+    @GetMapping(value = "/stream/{assistantMessageId}", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    @Operation(summary = "Lắng nghe kết quả trả về từ AI Assistant qua Server-Sent Events (SSE)")
+    public SseEmitter streamAssistantAnswer(@PathVariable("assistantMessageId") Long assistantMessageId) {
+        return sseService.createEmitter(assistantMessageId);
+    }
 
     @PostMapping("/space")
     @Operation(summary = "Hỏi đáp trên toàn bộ Không gian học tập sử dụng mô hình AI")

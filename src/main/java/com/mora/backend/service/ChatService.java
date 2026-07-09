@@ -13,6 +13,14 @@ public interface ChatService {
     SpaceChatResponse chatWithSpace(SpaceChatRequest request);
 
     /**
+     * Hỏi đáp bất đồng bộ với không gian học tập, publish event lên RabbitMQ và trả về message IDs.
+     *
+     * @param request DTO chứa ID Space và câu hỏi
+     * @return DTO chứa thông tin xử lý bất đồng bộ (userMessageId, assistantMessageId)
+     */
+    com.mora.backend.model.dto.response.AsyncChatResponse chatWithSpaceAsync(SpaceChatRequest request);
+
+    /**
      * Lấy lịch sử cuộc trò chuyện của một Không gian học tập.
      *
      * @param spaceId ID Space

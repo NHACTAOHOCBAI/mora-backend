@@ -8,6 +8,8 @@ import com.mora.backend.exception.ErrorCode;
 import com.mora.backend.model.dto.request.SpaceChatRequest;
 import com.mora.backend.model.dto.response.SpaceChatResponse;
 import com.mora.backend.model.dto.response.ChatMessageResponse;
+import com.mora.backend.model.dto.response.AsyncChatResponse;
+import com.mora.backend.model.dto.event.UserQuestionEvent;
 import com.mora.backend.model.entity.Space;
 import com.mora.backend.model.entity.ChatMessage;
 import com.mora.backend.model.entity.Document;
@@ -17,6 +19,7 @@ import com.mora.backend.repository.ChatMessageRepository;
 import com.mora.backend.repository.DocumentRepository;
 import com.mora.backend.repository.DocumentPageRepository;
 import com.mora.backend.service.ChatService;
+import com.mora.backend.service.EventPublisherService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -37,6 +40,7 @@ public class ChatServiceImpl implements ChatService {
     private final DocumentPageRepository documentPageRepository;
     private final AiServiceClient aiServiceClient;
     private final ChatSummaryHelper chatSummaryHelper;
+    private final EventPublisherService eventPublisherService;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Override
@@ -151,6 +155,73 @@ public class ChatServiceImpl implements ChatService {
                 .citations(responseCitations)
                 .condensedQuestion(pythonResponse.condensedQuestion)
                 .promptSent(pythonResponse.promptSent)
+                .build();
+    }
+
+    @Override
+    @Transactional
+    public AsyncChatResponse chatWithSpaceAsync(SpaceChatRequest request) {
+        Space space = spaceRepository.findById(request.getSpaceId())
+                .orElseThrow(() -> {
+                    log.warn("Space with ID {} not found for async chat", request.getSpaceId());
+                    return new AppException(ErrorCode.SPACE_NOT_FOUND);
+                });
+
+        List<Document> documents = documentRepository.findBySpaceId(request.getSpaceId());
+        List<UserQuestionEvent.ContextItem> contextItems = new ArrayList<>();
+        
+        for (Document doc : documents) {
+            List<DocumentPage> pages = documentPageRepository.findByDocumentIdOrderByPageNumberAsc(doc.getId());
+            for (DocumentPage page : pages) {
+                contextItems.add(UserQuestionEvent.ContextItem.builder()
+                        .pageNumber(page.getPageNumber())
+                        .text(page.getText())
+                        .documentId(doc.getId())
+                        .documentName(doc.getName())
+                        .build());
+            }
+        }
+
+        List<UserQuestionEvent.HistoryItem> historyItems = new ArrayList<>();
+        if (request.getHistory() != null) {
+            historyItems = request.getHistory().stream()
+                    .map(h -> UserQuestionEvent.HistoryItem.builder()
+                            .sender(h.getSender())
+                            .text(h.getText())
+                            .build())
+                    .toList();
+        }
+
+        ChatMessage userMessage = ChatMessage.builder()
+                .sender("user")
+                .text(request.getQuestion())
+                .space(space)
+                .build();
+        chatMessageRepository.save(userMessage);
+
+        ChatMessage assistantMessage = ChatMessage.builder()
+                .sender("assistant")
+                .text("")
+                .space(space)
+                .build();
+        chatMessageRepository.save(assistantMessage);
+
+        UserQuestionEvent event = UserQuestionEvent.builder()
+                .spaceId(space.getId())
+                .question(request.getQuestion())
+                .chatSummary(space.getChatSummary())
+                .userMessageId(userMessage.getId())
+                .assistantMessageId(assistantMessage.getId())
+                .context(contextItems)
+                .history(historyItems)
+                .build();
+
+        eventPublisherService.publishUserQuestion(event);
+
+        return AsyncChatResponse.builder()
+                .userMessageId(userMessage.getId())
+                .assistantMessageId(assistantMessage.getId())
+                .status("PENDING")
                 .build();
     }
 
