@@ -90,6 +90,7 @@ public class SpaceServiceImpl implements SpaceService {
                         .fileSize(d.getFileSize())
                         .contentType(d.getContentType())
                         .spaceId(d.getSpace().getId())
+                        .status(d.getStatus())
                         .createdAt(d.getCreatedAt())
                         .build())
                 .toList();

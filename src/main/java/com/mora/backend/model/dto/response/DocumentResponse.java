@@ -5,6 +5,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import com.mora.backend.model.entity.DocumentStatus;
 import java.time.LocalDateTime;
 
 @Data
@@ -17,6 +18,7 @@ public class DocumentResponse {
     private String storageUrl;
     private Long fileSize;
     private String contentType;
+    private DocumentStatus status;
     private Long spaceId;
     private LocalDateTime createdAt;
 }

@@ -34,6 +34,11 @@ public class Document {
     @Column(name = "content_type")
     private String contentType;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", nullable = false)
+    @Builder.Default
+    private DocumentStatus status = DocumentStatus.UPLOADING;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "space_id", nullable = false)
     private Space space;

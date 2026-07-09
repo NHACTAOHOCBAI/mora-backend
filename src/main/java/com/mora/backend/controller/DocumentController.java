@@ -91,6 +91,7 @@ public class DocumentController {
                 .fileSize(doc.getFileSize())
                 .contentType(doc.getContentType())
                 .spaceId(doc.getSpace().getId())
+                .status(doc.getStatus())
                 .createdAt(doc.getCreatedAt())
                 .build();
     }
