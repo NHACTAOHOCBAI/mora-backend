@@ -74,6 +74,8 @@ public class AiServiceClient {
         public String question;
         public List<ContextItem> context;
         public List<HistoryItem> history;
+        @JsonProperty("chat_summary")
+        public String chatSummary;
 
         public static class ContextItem {
             public int pageNumber;
@@ -111,6 +113,29 @@ public class AiServiceClient {
             throw new AppException(ErrorCode.AI_ENGINE_ERROR);
         } catch (Exception e) {
             log.error("Failed to call Python AI service /api/chat", e);
+            throw new AppException(ErrorCode.AI_ENGINE_ERROR);
+        }
+    }
+
+    public static class PythonSummarizeRequest {
+        public List<PythonChatRequest.HistoryItem> history;
+        @JsonProperty("previous_summary")
+        public String previousSummary;
+    }
+
+    public static class PythonSummarizeResponse {
+        public String summary;
+    }
+
+    public PythonSummarizeResponse callSummarize(PythonSummarizeRequest request) {
+        String url = aiServiceUrl + "/api/chat/summarize";
+        try {
+            return restTemplate.postForObject(url, request, PythonSummarizeResponse.class);
+        } catch (org.springframework.web.client.HttpStatusCodeException e) {
+            log.error("Failed to call Python AI service /api/chat/summarize. Error response: {}", e.getResponseBodyAsString(), e);
+            throw new AppException(ErrorCode.AI_ENGINE_ERROR);
+        } catch (Exception e) {
+            log.error("Failed to call Python AI service /api/chat/summarize", e);
             throw new AppException(ErrorCode.AI_ENGINE_ERROR);
         }
     }

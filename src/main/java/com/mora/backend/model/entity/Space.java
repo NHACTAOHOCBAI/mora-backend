@@ -36,6 +36,9 @@ public class Space {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
+    @Column(name = "chat_summary", columnDefinition = "TEXT")
+    private String chatSummary;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id")
     private User user;

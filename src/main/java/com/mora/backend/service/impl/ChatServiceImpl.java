@@ -36,6 +36,7 @@ public class ChatServiceImpl implements ChatService {
     private final DocumentRepository documentRepository;
     private final DocumentPageRepository documentPageRepository;
     private final AiServiceClient aiServiceClient;
+    private final ChatSummaryHelper chatSummaryHelper;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Override
@@ -90,6 +91,7 @@ public class ChatServiceImpl implements ChatService {
         pythonRequest.question = request.getQuestion();
         pythonRequest.context = contextItems;
         pythonRequest.history = historyItems;
+        pythonRequest.chatSummary = space.getChatSummary();
 
         AiServiceClient.PythonChatResponse pythonResponse = aiServiceClient.callChat(pythonRequest);
 
@@ -110,6 +112,25 @@ public class ChatServiceImpl implements ChatService {
                 .citations(citationsJson)
                 .build();
         chatMessageRepository.save(assistantMessage);
+
+        // 6.5. Kích hoạt tiến trình chạy ngầm để tóm tắt lịch sử hội thoại
+        try {
+            List<AiServiceClient.PythonChatRequest.HistoryItem> fullHistoryForSummary = new ArrayList<>(historyItems);
+            
+            AiServiceClient.PythonChatRequest.HistoryItem newUserMsg = new AiServiceClient.PythonChatRequest.HistoryItem();
+            newUserMsg.sender = "user";
+            newUserMsg.text = request.getQuestion();
+            fullHistoryForSummary.add(newUserMsg);
+
+            AiServiceClient.PythonChatRequest.HistoryItem newAssistantMsg = new AiServiceClient.PythonChatRequest.HistoryItem();
+            newAssistantMsg.sender = "assistant";
+            newAssistantMsg.text = pythonResponse.answer;
+            fullHistoryForSummary.add(newAssistantMsg);
+
+            chatSummaryHelper.updateSpaceChatSummary(space.getId(), fullHistoryForSummary);
+        } catch (Exception e) {
+            log.error("Failed to trigger background chat summarization", e);
+        }
 
         // 7. Chuyển đổi Citations sang định dạng Response DTO
         List<SpaceChatResponse.SpaceCitation> responseCitations = new ArrayList<>();
@@ -144,6 +165,10 @@ public class ChatServiceImpl implements ChatService {
     @Transactional
     public void clearSpaceChatHistory(Long spaceId) {
         chatMessageRepository.deleteBySpaceId(spaceId);
+        spaceRepository.findById(spaceId).ifPresent(space -> {
+            space.setChatSummary(null);
+            spaceRepository.save(space);
+        });
     }
 
     private ChatMessageResponse mapToResponse(ChatMessage msg) {
