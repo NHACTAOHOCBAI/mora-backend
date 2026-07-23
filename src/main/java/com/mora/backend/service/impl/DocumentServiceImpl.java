@@ -48,7 +48,7 @@ public class DocumentServiceImpl implements DocumentService {
         doc = documentRepository.save(doc);
 
         // 2. Trigger asynchronous processing
-        documentAsyncProcessor.processDocumentAsync(doc.getId(), content, name, contentType);
+        documentAsyncProcessor.processDocumentAsync(doc.getId(), spaceId, content, name, contentType);
 
         return doc;
     }

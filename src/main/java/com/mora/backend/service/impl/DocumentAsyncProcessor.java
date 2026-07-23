@@ -11,7 +11,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -28,8 +27,7 @@ public class DocumentAsyncProcessor {
     private final AiServiceClient aiServiceClient;
 
     @Async
-    @Transactional
-    public void processDocumentAsync(Long documentId, byte[] content, String originalName, String contentType) {
+    public void processDocumentAsync(Long documentId, Long spaceId, byte[] content, String originalName, String contentType) {
         log.info("Starting async processing for document ID: {}", documentId);
         Document doc = documentRepository.findById(documentId).orElse(null);
         if (doc == null) {
@@ -76,7 +74,7 @@ public class DocumentAsyncProcessor {
 
             // 3. Call Python AI Service to Index (indexing vector & keywords)
             try {
-                aiServiceClient.indexDocument(doc.getId(), doc.getSpace().getId(), doc.getName(), pages);
+                aiServiceClient.indexDocument(doc.getId(), spaceId, doc.getName(), pages);
             } catch (Exception e) {
                 log.error("Failed to index document in AI Service, but continuing", e);
             }
