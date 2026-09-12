@@ -36,11 +36,21 @@ public class ChatServiceImpl implements ChatService {
     private final DocumentPageRepository documentPageRepository;
     private final AiServiceClient aiServiceClient;
     private final ChatSummaryHelper chatSummaryHelper;
+    private final com.mora.backend.service.UserService userService;
+    private final com.mora.backend.service.UserAiSettingService userAiSettingService;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Override
     @Transactional
     public SpaceChatResponse chatWithSpace(SpaceChatRequest request) {
+        // 0. Lấy thông tin User hiện tại và kiểm tra cấu hình Gemini API Key
+        com.mora.backend.model.entity.User currentUser = userService.getCurrentUser();
+        com.mora.backend.model.entity.UserAiSetting userSetting = userAiSettingService.getSettingForUser(currentUser);
+        if (userSetting.getGeminiApiKey() == null || userSetting.getGeminiApiKey().isBlank()) {
+            log.warn("User {} chưa cấu hình Gemini API Key", currentUser.getUsername());
+            throw new AppException(ErrorCode.GEMINI_API_KEY_REQUIRED);
+        }
+
         // 1. Kiểm tra Space tồn tại
         Space space = spaceRepository.findById(request.getSpaceId())
                 .orElseThrow(() -> {
@@ -85,14 +95,22 @@ public class ChatServiceImpl implements ChatService {
                 .build();
         chatMessageRepository.save(userMessage);
 
-        // 5. Gọi Python AI Service
+        // 5. Gọi Python AI Service với Key và Model của User
         AiServiceClient.PythonChatRequest pythonRequest = new AiServiceClient.PythonChatRequest();
         pythonRequest.question = request.getQuestion();
         pythonRequest.context = contextItems;
         pythonRequest.history = historyItems;
         pythonRequest.chatSummary = space.getChatSummary();
+        pythonRequest.apiKey = userSetting.getGeminiApiKey();
+        pythonRequest.chatModel = userSetting.getChatModel();
+        pythonRequest.routerModel = userSetting.getRouterModel();
+        pythonRequest.evaluatorModel = userSetting.getEvaluatorModel();
 
         AiServiceClient.PythonChatResponse pythonResponse = aiServiceClient.callChat(pythonRequest);
+
+        // Ghi nhận lượt sử dụng Model hôm nay
+        userAiSettingService.recordUsage(currentUser.getId(), userSetting.getChatModel());
+        userAiSettingService.recordUsage(currentUser.getId(), userSetting.getRouterModel());
 
         // 6. Lưu phản hồi của Assistant kèm Citations JSON
         String citationsJson = "";
@@ -126,7 +144,13 @@ public class ChatServiceImpl implements ChatService {
             newAssistantMsg.text = pythonResponse.answer;
             fullHistoryForSummary.add(newAssistantMsg);
 
-            chatSummaryHelper.updateSpaceChatSummary(space.getId(), fullHistoryForSummary);
+            chatSummaryHelper.updateSpaceChatSummary(
+                    space.getId(), 
+                    currentUser.getId(),
+                    userSetting.getGeminiApiKey(), 
+                    userSetting.getSummarizerModel(), 
+                    fullHistoryForSummary
+            );
         } catch (Exception e) {
             log.error("Failed to trigger background chat summarization", e);
         }

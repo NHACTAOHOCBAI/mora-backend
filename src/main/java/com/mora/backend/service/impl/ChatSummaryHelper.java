@@ -3,6 +3,7 @@ package com.mora.backend.service.impl;
 import com.mora.backend.client.AiServiceClient;
 import com.mora.backend.model.entity.Space;
 import com.mora.backend.repository.SpaceRepository;
+import com.mora.backend.service.UserAiSettingService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Async;
@@ -18,10 +19,22 @@ public class ChatSummaryHelper {
 
     private final SpaceRepository spaceRepository;
     private final AiServiceClient aiServiceClient;
+    private final UserAiSettingService userAiSettingService;
 
     @Async
     @Transactional
-    public void updateSpaceChatSummary(Long spaceId, List<AiServiceClient.PythonChatRequest.HistoryItem> history) {
+    public void updateSpaceChatSummary(
+            Long spaceId, 
+            Long userId, 
+            String apiKey, 
+            String summarizerModel, 
+            List<AiServiceClient.PythonChatRequest.HistoryItem> history
+    ) {
+        if (apiKey == null || apiKey.isBlank()) {
+            log.warn("Bỏ qua tóm tắt cuộc hội thoại cho Space ID: {} do thiếu API Key", spaceId);
+            return;
+        }
+
         log.info("Bắt đầu tiến trình chạy ngầm tóm tắt cuộc hội thoại cho Space ID: {}", spaceId);
         try {
             Space space = spaceRepository.findById(spaceId).orElse(null);
@@ -33,12 +46,15 @@ public class ChatSummaryHelper {
             AiServiceClient.PythonSummarizeRequest request = new AiServiceClient.PythonSummarizeRequest();
             request.history = history;
             request.previousSummary = space.getChatSummary();
+            request.apiKey = apiKey;
+            request.summarizerModel = summarizerModel;
 
             AiServiceClient.PythonSummarizeResponse response = aiServiceClient.callSummarize(request);
             if (response != null && response.summary != null) {
                 space.setChatSummary(response.summary);
                 spaceRepository.save(space);
                 log.info("Cập nhật tóm tắt hội thoại thành công cho Space ID: {}", spaceId);
+                userAiSettingService.recordUsage(userId, summarizerModel != null ? summarizerModel : "gemini-3.1-flash-lite");
             }
         } catch (Exception e) {
             log.error("Lỗi khi chạy ngầm tóm tắt cuộc hội thoại cho Space ID: {}", spaceId, e);

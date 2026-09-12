@@ -7,6 +7,7 @@ import com.mora.backend.model.entity.DocumentStatus;
 import com.mora.backend.repository.DocumentPageRepository;
 import com.mora.backend.repository.DocumentRepository;
 import com.mora.backend.service.StorageService;
+import com.mora.backend.service.UserAiSettingService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Async;
@@ -25,9 +26,19 @@ public class DocumentAsyncProcessor {
     private final DocumentPageRepository documentPageRepository;
     private final StorageService storageService;
     private final AiServiceClient aiServiceClient;
+    private final UserAiSettingService userAiSettingService;
 
     @Async
-    public void processDocumentAsync(Long documentId, Long spaceId, byte[] content, String originalName, String contentType) {
+    public void processDocumentAsync(
+            Long documentId, 
+            Long spaceId, 
+            byte[] content, 
+            String originalName, 
+            String contentType,
+            Long userId,
+            String apiKey,
+            String parserModel
+    ) {
         log.info("Starting async processing for document ID: {}", documentId);
         Document doc = documentRepository.findById(documentId).orElse(null);
         if (doc == null) {
@@ -47,7 +58,7 @@ public class DocumentAsyncProcessor {
             // 2. Extract text (Parsing via Python AI Service Parser)
             List<DocumentPage> pages = new ArrayList<>();
             if ("application/pdf".equalsIgnoreCase(contentType)) {
-                List<AiServiceClient.PythonPageResponse> parsedPages = aiServiceClient.parsePdf(content, originalName);
+                List<AiServiceClient.PythonPageResponse> parsedPages = aiServiceClient.parsePdf(content, originalName, apiKey, parserModel);
                 for (AiServiceClient.PythonPageResponse pPage : parsedPages) {
                     DocumentPage page = DocumentPage.builder()
                             .document(doc)
@@ -58,6 +69,7 @@ public class DocumentAsyncProcessor {
                 }
                 documentPageRepository.saveAll(pages);
                 log.info("Extracted and structured {} pages via Python Parser for document ID: {}", pages.size(), doc.getId());
+                userAiSettingService.recordUsage(userId, parserModel != null ? parserModel : "gemini-3.5-flash-lite");
             } else {
                 DocumentPage page = DocumentPage.builder()
                         .document(doc)

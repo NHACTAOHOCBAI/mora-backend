@@ -5,11 +5,15 @@ import com.mora.backend.exception.ErrorCode;
 import com.mora.backend.model.entity.Document;
 import com.mora.backend.model.entity.DocumentStatus;
 import com.mora.backend.model.entity.Space;
+import com.mora.backend.model.entity.User;
+import com.mora.backend.model.entity.UserAiSetting;
 import com.mora.backend.repository.DocumentPageRepository;
 import com.mora.backend.repository.DocumentRepository;
 import com.mora.backend.repository.SpaceRepository;
 import com.mora.backend.service.DocumentService;
 import com.mora.backend.service.StorageService;
+import com.mora.backend.service.UserAiSettingService;
+import com.mora.backend.service.UserService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -27,11 +31,20 @@ public class DocumentServiceImpl implements DocumentService {
     private final SpaceRepository spaceRepository;
     private final StorageService storageService;
     private final DocumentAsyncProcessor documentAsyncProcessor;
+    private final UserService userService;
+    private final UserAiSettingService userAiSettingService;
 
     @Override
     @Transactional
     public Document uploadDocument(Long spaceId, String name, byte[] content, String contentType) {
         log.info("Creating upload placeholder document: name={}, size={}, contentType={}, spaceId={}", name, content.length, contentType, spaceId);
+
+        User currentUser = userService.getCurrentUser();
+        UserAiSetting userSetting = userAiSettingService.getSettingForUser(currentUser);
+        if (userSetting.getGeminiApiKey() == null || userSetting.getGeminiApiKey().isBlank()) {
+            log.warn("User {} chưa cấu hình Gemini API Key khi tải tài liệu", currentUser.getUsername());
+            throw new AppException(ErrorCode.GEMINI_API_KEY_REQUIRED);
+        }
 
         Space space = spaceRepository.findById(spaceId)
                 .orElseThrow(() -> new AppException(ErrorCode.SPACE_NOT_FOUND));
@@ -48,7 +61,16 @@ public class DocumentServiceImpl implements DocumentService {
         doc = documentRepository.save(doc);
 
         // 2. Trigger asynchronous processing
-        documentAsyncProcessor.processDocumentAsync(doc.getId(), spaceId, content, name, contentType);
+        documentAsyncProcessor.processDocumentAsync(
+                doc.getId(), 
+                spaceId, 
+                content, 
+                name, 
+                contentType,
+                currentUser.getId(),
+                userSetting.getGeminiApiKey(),
+                userSetting.getParserModel()
+        );
 
         return doc;
     }

@@ -21,7 +21,6 @@ public class AiServiceClient {
     @Value("${ai-service.url:http://localhost:8000}")
     private String aiServiceUrl;
 
-
     public static class PythonEvaluationResponse {
         public String approachName;
         public Double faithfulness;
@@ -77,6 +76,18 @@ public class AiServiceClient {
         @JsonProperty("chat_summary")
         public String chatSummary;
 
+        @JsonProperty("api_key")
+        public String apiKey;
+
+        @JsonProperty("chat_model")
+        public String chatModel;
+
+        @JsonProperty("router_model")
+        public String routerModel;
+
+        @JsonProperty("evaluator_model")
+        public String evaluatorModel;
+
         public static class ContextItem {
             public int pageNumber;
             public String text;
@@ -121,6 +132,12 @@ public class AiServiceClient {
         public List<PythonChatRequest.HistoryItem> history;
         @JsonProperty("previous_summary")
         public String previousSummary;
+
+        @JsonProperty("api_key")
+        public String apiKey;
+
+        @JsonProperty("summarizer_model")
+        public String summarizerModel;
     }
 
     public static class PythonSummarizeResponse {
@@ -150,7 +167,7 @@ public class AiServiceClient {
         public List<PythonPageResponse> pages;
     }
 
-    public List<PythonPageResponse> parsePdf(byte[] pdfBytes, String fileName) {
+    public List<PythonPageResponse> parsePdf(byte[] pdfBytes, String fileName, String apiKey, String parserModel) {
         String url = aiServiceUrl + "/api/parse";
 
         org.springframework.http.HttpHeaders headers = new org.springframework.http.HttpHeaders();
@@ -164,6 +181,12 @@ public class AiServiceClient {
             }
         };
         body.add("file", fileResource);
+        if (apiKey != null && !apiKey.isBlank()) {
+            body.add("api_key", apiKey);
+        }
+        if (parserModel != null && !parserModel.isBlank()) {
+            body.add("parser_model", parserModel);
+        }
 
         org.springframework.http.HttpEntity<org.springframework.util.LinkedMultiValueMap<String, Object>> requestEntity =
                 new org.springframework.http.HttpEntity<>(body, headers);
@@ -177,6 +200,34 @@ public class AiServiceClient {
         } catch (Exception e) {
             log.error("Failed to parse PDF through Python AI service", e);
             throw new AppException(ErrorCode.PDF_PROCESSING_FAILED);
+        }
+    }
+
+    public static class PythonValidateKeyRequest {
+        @JsonProperty("api_key")
+        public String apiKey;
+        @JsonProperty("model_name")
+        public String modelName;
+    }
+
+    public static class PythonValidateKeyResponse {
+        public boolean valid;
+        public String message;
+    }
+
+    public PythonValidateKeyResponse callValidateKey(String apiKey, String modelName) {
+        String url = aiServiceUrl + "/api/chat/validate-key";
+        PythonValidateKeyRequest request = new PythonValidateKeyRequest();
+        request.apiKey = apiKey;
+        request.modelName = modelName;
+        try {
+            return restTemplate.postForObject(url, request, PythonValidateKeyResponse.class);
+        } catch (Exception e) {
+            log.error("Failed to validate key with Python AI service", e);
+            PythonValidateKeyResponse res = new PythonValidateKeyResponse();
+            res.valid = false;
+            res.message = "Không thể kết nối đến dịch vụ AI để kiểm tra: " + e.getMessage();
+            return res;
         }
     }
 

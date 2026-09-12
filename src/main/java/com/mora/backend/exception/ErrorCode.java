@@ -24,7 +24,8 @@ public enum ErrorCode {
     BENCHMARK_QUESTION_NOT_FOUND(1016, "Không tìm thấy câu hỏi đánh giá", HttpStatus.NOT_FOUND),
     BENCHMARK_RUN_NOT_FOUND(1017, "Không tìm thấy kết quả đánh giá", HttpStatus.NOT_FOUND),
     OLD_PASSWORD_INCORRECT(1018, "Mật khẩu cũ không chính xác", HttpStatus.BAD_REQUEST),
-    FILE_TOO_LARGE(1019, "Kích thước ảnh đại diện không được vượt quá 5MB", HttpStatus.BAD_REQUEST)
+    FILE_TOO_LARGE(1019, "Kích thước ảnh đại diện không được vượt quá 5MB", HttpStatus.BAD_REQUEST),
+    GEMINI_API_KEY_REQUIRED(1020, "Vui lòng cấu hình Gemini API Key từ Google AI Studio trong Cài đặt trước khi sử dụng", HttpStatus.BAD_REQUEST)
     ;
 
     private final int code;
