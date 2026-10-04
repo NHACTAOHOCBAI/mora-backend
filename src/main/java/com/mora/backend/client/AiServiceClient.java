@@ -71,6 +71,10 @@ public class AiServiceClient {
 
     public static class PythonChatRequest {
         public String question;
+        @JsonProperty("space_id")
+        public Long spaceId;
+        @JsonProperty("document_id")
+        public Long documentId;
         public List<ContextItem> context;
         public List<HistoryItem> history;
         @JsonProperty("chat_summary")
@@ -231,7 +235,7 @@ public class AiServiceClient {
         }
     }
 
-    public void indexDocument(Long documentId, Long spaceId, String documentName, List<com.mora.backend.model.entity.DocumentPage> pages) {
+    public void indexDocument(Long documentId, Long spaceId, String documentName, List<com.mora.backend.model.entity.DocumentPage> pages, String apiKey) {
         String url = aiServiceUrl + "/api/index";
         
         List<Map<String, Object>> pagesPayload = pages.stream()
@@ -241,12 +245,14 @@ public class AiServiceClient {
                 ))
                 .toList();
 
-        Map<String, Object> request = Map.of(
-                "documentId", documentId,
-                "spaceId", spaceId,
-                "documentName", documentName,
-                "pages", pagesPayload
-        );
+        Map<String, Object> request = new java.util.HashMap<>();
+        request.put("documentId", documentId);
+        request.put("spaceId", spaceId);
+        request.put("documentName", documentName);
+        request.put("pages", pagesPayload);
+        if (apiKey != null && !apiKey.isBlank()) {
+            request.put("apiKey", apiKey);
+        }
 
         try {
             restTemplate.postForObject(url, request, Void.class);

@@ -40,6 +40,8 @@ public class ChatServiceImpl implements ChatService {
     private final com.mora.backend.service.UserAiSettingService userAiSettingService;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
+    private static final int SUMMARY_BATCH_INTERVAL = 6;
+
     @Override
     @Transactional
     public SpaceChatResponse chatWithSpace(SpaceChatRequest request) {
@@ -98,6 +100,7 @@ public class ChatServiceImpl implements ChatService {
         // 5. Gọi Python AI Service với Key và Model của User
         AiServiceClient.PythonChatRequest pythonRequest = new AiServiceClient.PythonChatRequest();
         pythonRequest.question = request.getQuestion();
+        pythonRequest.spaceId = space.getId();
         pythonRequest.context = contextItems;
         pythonRequest.history = historyItems;
         pythonRequest.chatSummary = space.getChatSummary();
@@ -130,27 +133,33 @@ public class ChatServiceImpl implements ChatService {
                 .build();
         chatMessageRepository.save(assistantMessage);
 
-        // 6.5. Kích hoạt tiến trình chạy ngầm để tóm tắt lịch sử hội thoại
+        // 6.5. Kích hoạt tiến trình chạy ngầm để tóm tắt lịch sử hội thoại theo chu kỳ (Batching)
         try {
-            List<AiServiceClient.PythonChatRequest.HistoryItem> fullHistoryForSummary = new ArrayList<>(historyItems);
-            
-            AiServiceClient.PythonChatRequest.HistoryItem newUserMsg = new AiServiceClient.PythonChatRequest.HistoryItem();
-            newUserMsg.sender = "user";
-            newUserMsg.text = request.getQuestion();
-            fullHistoryForSummary.add(newUserMsg);
+            long assistantMsgCount = chatMessageRepository.countBySpaceIdAndSender(space.getId(), "assistant");
+            if (assistantMsgCount > 0 && assistantMsgCount % SUMMARY_BATCH_INTERVAL == 0) {
+                log.info("Đạt chu kỳ tóm tắt hội thoại (Lượt thứ {}). Kích hoạt tóm tắt ngầm cho Space ID: {}", assistantMsgCount, space.getId());
+                List<AiServiceClient.PythonChatRequest.HistoryItem> fullHistoryForSummary = new ArrayList<>(historyItems);
+                
+                AiServiceClient.PythonChatRequest.HistoryItem newUserMsg = new AiServiceClient.PythonChatRequest.HistoryItem();
+                newUserMsg.sender = "user";
+                newUserMsg.text = request.getQuestion();
+                fullHistoryForSummary.add(newUserMsg);
 
-            AiServiceClient.PythonChatRequest.HistoryItem newAssistantMsg = new AiServiceClient.PythonChatRequest.HistoryItem();
-            newAssistantMsg.sender = "assistant";
-            newAssistantMsg.text = pythonResponse.answer;
-            fullHistoryForSummary.add(newAssistantMsg);
+                AiServiceClient.PythonChatRequest.HistoryItem newAssistantMsg = new AiServiceClient.PythonChatRequest.HistoryItem();
+                newAssistantMsg.sender = "assistant";
+                newAssistantMsg.text = pythonResponse.answer;
+                fullHistoryForSummary.add(newAssistantMsg);
 
-            chatSummaryHelper.updateSpaceChatSummary(
-                    space.getId(), 
-                    currentUser.getId(),
-                    userSetting.getGeminiApiKey(), 
-                    userSetting.getSummarizerModel(), 
-                    fullHistoryForSummary
-            );
+                chatSummaryHelper.updateSpaceChatSummary(
+                        space.getId(), 
+                        currentUser.getId(),
+                        userSetting.getGeminiApiKey(), 
+                        userSetting.getSummarizerModel(), 
+                        fullHistoryForSummary
+                );
+            } else {
+                log.debug("Bỏ qua tóm tắt cho Space ID: {} (Lượt thứ {}/{})", space.getId(), assistantMsgCount % SUMMARY_BATCH_INTERVAL, SUMMARY_BATCH_INTERVAL);
+            }
         } catch (Exception e) {
             log.error("Failed to trigger background chat summarization", e);
         }

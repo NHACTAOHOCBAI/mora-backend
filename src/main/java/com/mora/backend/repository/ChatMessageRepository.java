@@ -11,5 +11,7 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long> 
 
     List<ChatMessage> findBySpaceIdOrderByCreatedAtAsc(Long spaceId);
 
+    long countBySpaceIdAndSender(Long spaceId, String sender);
+
     void deleteBySpaceId(Long spaceId);
 }
