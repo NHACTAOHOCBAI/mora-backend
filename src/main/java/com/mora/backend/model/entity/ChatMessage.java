@@ -44,6 +44,18 @@ public class ChatMessage {
     @Column(name = "citations", columnDefinition = "TEXT")
     private String citations; // JSON string chứa danh sách Citation
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id")
+    private User user;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "message_type", length = 30)
+    @Builder.Default
+    private MessageType messageType = MessageType.USER_MESSAGE;
+
+    @Column(name = "selected_document_ids", columnDefinition = "TEXT")
+    private String selectedDocumentIds; // JSON string [1, 2]
+
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;

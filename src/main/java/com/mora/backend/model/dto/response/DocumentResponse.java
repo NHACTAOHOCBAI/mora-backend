@@ -1,11 +1,11 @@
 package com.mora.backend.model.dto.response;
 
+import com.mora.backend.model.entity.DocumentStatus;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import com.mora.backend.model.entity.DocumentStatus;
 import java.time.LocalDateTime;
 
 @Data
@@ -20,5 +20,7 @@ public class DocumentResponse {
     private String contentType;
     private DocumentStatus status;
     private Long spaceId;
+    private Long uploadedById;
+    private String uploadedByName;
     private LocalDateTime createdAt;
 }

@@ -12,14 +12,12 @@ import java.time.LocalDateTime;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class SpaceResponse {
+public class SpaceMemberResponse {
     private Long id;
-    private String name;
-    private String description;
-    private LocalDateTime createdAt;
-    private LocalDateTime updatedAt;
-    private SpaceRole currentUserRole;
-    private int memberCount;
-    private int documentCount;
-    private String ownerName;
+    private Long userId;
+    private String username;
+    private String fullName;
+    private String avatarUrl;
+    private SpaceRole role;
+    private LocalDateTime joinedAt;
 }

@@ -25,7 +25,13 @@ public enum ErrorCode {
     BENCHMARK_RUN_NOT_FOUND(1017, "Không tìm thấy kết quả đánh giá", HttpStatus.NOT_FOUND),
     OLD_PASSWORD_INCORRECT(1018, "Mật khẩu cũ không chính xác", HttpStatus.BAD_REQUEST),
     FILE_TOO_LARGE(1019, "Kích thước ảnh đại diện không được vượt quá 5MB", HttpStatus.BAD_REQUEST),
-    GEMINI_API_KEY_REQUIRED(1020, "Vui lòng cấu hình Gemini API Key từ Google AI Studio trong Cài đặt trước khi sử dụng", HttpStatus.BAD_REQUEST)
+    GEMINI_API_KEY_REQUIRED(1020, "Vui lòng cấu hình Gemini API Key từ Google AI Studio trong Cài đặt trước khi sử dụng", HttpStatus.BAD_REQUEST),
+    SPACE_MEMBER_NOT_FOUND(1021, "Không tìm thấy thành viên trong Không gian học tập", HttpStatus.NOT_FOUND),
+    SPACE_MEMBER_ALREADY_EXISTS(1022, "Người dùng đã là thành viên của Không gian học tập", HttpStatus.BAD_REQUEST),
+    INVITATION_NOT_FOUND(1023, "Mã mời không tồn tại hoặc đã hết hiệu lực", HttpStatus.NOT_FOUND),
+    INVITATION_EXPIRED(1024, "Mã mời đã hết hạn", HttpStatus.BAD_REQUEST),
+    CANNOT_REMOVE_OWNER(1025, "Không thể xóa chủ sở hữu Không gian học tập", HttpStatus.BAD_REQUEST),
+    SPACE_ACCESS_DENIED(1026, "Bạn không có quyền thực hiện hành động này trong Không gian học tập", HttpStatus.FORBIDDEN)
     ;
 
     private final int code;

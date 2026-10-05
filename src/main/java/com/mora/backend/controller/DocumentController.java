@@ -84,6 +84,10 @@ public class DocumentController {
     }
 
     private DocumentResponse convertToResponse(Document doc) {
+        String uploadedByName = doc.getUploadedBy() != null
+                ? (doc.getUploadedBy().getFullName() != null ? doc.getUploadedBy().getFullName() : doc.getUploadedBy().getUsername())
+                : null;
+
         return DocumentResponse.builder()
                 .id(doc.getId())
                 .name(doc.getName())
@@ -92,6 +96,8 @@ public class DocumentController {
                 .contentType(doc.getContentType())
                 .spaceId(doc.getSpace().getId())
                 .status(doc.getStatus())
+                .uploadedById(doc.getUploadedBy() != null ? doc.getUploadedBy().getId() : null)
+                .uploadedByName(uploadedByName)
                 .createdAt(doc.getCreatedAt())
                 .build();
     }

@@ -5,18 +5,15 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mora.backend.client.AiServiceClient;
 import com.mora.backend.exception.AppException;
 import com.mora.backend.exception.ErrorCode;
+import com.mora.backend.model.dto.request.GroupChatMessageRequest;
 import com.mora.backend.model.dto.request.SpaceChatRequest;
-import com.mora.backend.model.dto.response.SpaceChatResponse;
 import com.mora.backend.model.dto.response.ChatMessageResponse;
-import com.mora.backend.model.entity.Space;
-import com.mora.backend.model.entity.ChatMessage;
-import com.mora.backend.model.entity.Document;
-import com.mora.backend.model.entity.DocumentPage;
-import com.mora.backend.repository.SpaceRepository;
-import com.mora.backend.repository.ChatMessageRepository;
-import com.mora.backend.repository.DocumentRepository;
-import com.mora.backend.repository.DocumentPageRepository;
+import com.mora.backend.model.dto.response.SpaceChatResponse;
+import com.mora.backend.model.entity.*;
+import com.mora.backend.repository.*;
 import com.mora.backend.service.ChatService;
+import com.mora.backend.service.UserAiSettingService;
+import com.mora.backend.service.UserService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -24,6 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -31,39 +29,73 @@ import java.util.List;
 public class ChatServiceImpl implements ChatService {
 
     private final SpaceRepository spaceRepository;
+    private final SpaceMemberRepository spaceMemberRepository;
     private final ChatMessageRepository chatMessageRepository;
     private final DocumentRepository documentRepository;
     private final DocumentPageRepository documentPageRepository;
     private final AiServiceClient aiServiceClient;
     private final ChatSummaryHelper chatSummaryHelper;
-    private final com.mora.backend.service.UserService userService;
-    private final com.mora.backend.service.UserAiSettingService userAiSettingService;
+    private final UserService userService;
+    private final UserAiSettingService userAiSettingService;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     private static final int SUMMARY_BATCH_INTERVAL = 6;
 
     @Override
     @Transactional
+    public ChatMessageResponse sendGroupMessage(GroupChatMessageRequest request) {
+        User currentUser = userService.getCurrentUser();
+        Space space = spaceRepository.findById(request.getSpaceId())
+                .orElseThrow(() -> new AppException(ErrorCode.SPACE_NOT_FOUND));
+
+        SpaceRole userRole = getUserRole(space, currentUser);
+        if (currentUser.getRole() != Role.ROLE_ADMIN && userRole == null) {
+            throw new AppException(ErrorCode.UNAUTHORIZED);
+        }
+
+        ChatMessage userMessage = ChatMessage.builder()
+                .sender("user")
+                .messageType(MessageType.USER_MESSAGE)
+                .user(currentUser)
+                .text(request.getText())
+                .space(space)
+                .build();
+        userMessage = chatMessageRepository.save(userMessage);
+
+        log.info("Saved group message from user {} in space {}", currentUser.getUsername(), space.getId());
+        return mapToResponse(userMessage);
+    }
+
+    @Override
+    @Transactional
     public SpaceChatResponse chatWithSpace(SpaceChatRequest request) {
-        // 0. Lấy thông tin User hiện tại và kiểm tra cấu hình Gemini API Key
-        com.mora.backend.model.entity.User currentUser = userService.getCurrentUser();
-        com.mora.backend.model.entity.UserAiSetting userSetting = userAiSettingService.getSettingForUser(currentUser);
+        User currentUser = userService.getCurrentUser();
+        UserAiSetting userSetting = userAiSettingService.getSettingForUser(currentUser);
         if (userSetting.getGeminiApiKey() == null || userSetting.getGeminiApiKey().isBlank()) {
             log.warn("User {} chưa cấu hình Gemini API Key", currentUser.getUsername());
             throw new AppException(ErrorCode.GEMINI_API_KEY_REQUIRED);
         }
 
-        // 1. Kiểm tra Space tồn tại
         Space space = spaceRepository.findById(request.getSpaceId())
                 .orElseThrow(() -> {
                     log.warn("Space with ID {} not found for chat", request.getSpaceId());
                     return new AppException(ErrorCode.SPACE_NOT_FOUND);
                 });
 
-        // 2. Lấy danh sách tài liệu và nội dung text các trang
-        List<Document> documents = documentRepository.findBySpaceId(request.getSpaceId());
+        SpaceRole userRole = getUserRole(space, currentUser);
+        if (currentUser.getRole() != Role.ROLE_ADMIN && userRole == null) {
+            throw new AppException(ErrorCode.UNAUTHORIZED);
+        }
+
+        // Lấy danh sách tài liệu
+        List<Document> documents;
+        if (request.getDocumentIds() != null && !request.getDocumentIds().isEmpty()) {
+            documents = documentRepository.findAllById(request.getDocumentIds());
+        } else {
+            documents = documentRepository.findBySpaceId(request.getSpaceId());
+        }
+
         List<AiServiceClient.PythonChatRequest.ContextItem> contextItems = new ArrayList<>();
-        
         for (Document doc : documents) {
             List<DocumentPage> pages = documentPageRepository.findByDocumentIdOrderByPageNumberAsc(doc.getId());
             for (DocumentPage page : pages) {
@@ -76,7 +108,7 @@ public class ChatServiceImpl implements ChatService {
             }
         }
 
-        // 3. Lấy lịch sử hội thoại được gửi lên từ Request
+        // Lịch sử hội thoại
         List<AiServiceClient.PythonChatRequest.HistoryItem> historyItems = new ArrayList<>();
         if (request.getHistory() != null) {
             historyItems = request.getHistory().stream()
@@ -89,18 +121,31 @@ public class ChatServiceImpl implements ChatService {
                     .toList();
         }
 
-        // 4. Lưu tin nhắn của User vào DB trước
+        String docIdsJson = "";
+        if (request.getDocumentIds() != null && !request.getDocumentIds().isEmpty()) {
+            try {
+                docIdsJson = objectMapper.writeValueAsString(request.getDocumentIds());
+            } catch (Exception e) {
+                log.warn("Failed to serialize documentIds", e);
+            }
+        }
+
+        // Lưu câu hỏi của User (AI_QUERY)
         ChatMessage userMessage = ChatMessage.builder()
                 .sender("user")
+                .messageType(MessageType.AI_QUERY)
+                .user(currentUser)
                 .text(request.getQuestion())
+                .selectedDocumentIds(docIdsJson)
                 .space(space)
                 .build();
         chatMessageRepository.save(userMessage);
 
-        // 5. Gọi Python AI Service với Key và Model của User
+        // Gọi Python AI Service
         AiServiceClient.PythonChatRequest pythonRequest = new AiServiceClient.PythonChatRequest();
         pythonRequest.question = request.getQuestion();
         pythonRequest.spaceId = space.getId();
+        pythonRequest.documentIds = request.getDocumentIds();
         pythonRequest.context = contextItems;
         pythonRequest.history = historyItems;
         pythonRequest.chatSummary = space.getChatSummary();
@@ -111,11 +156,10 @@ public class ChatServiceImpl implements ChatService {
 
         AiServiceClient.PythonChatResponse pythonResponse = aiServiceClient.callChat(pythonRequest);
 
-        // Ghi nhận lượt sử dụng Model hôm nay
         userAiSettingService.recordUsage(currentUser.getId(), userSetting.getChatModel());
         userAiSettingService.recordUsage(currentUser.getId(), userSetting.getRouterModel());
 
-        // 6. Lưu phản hồi của Assistant kèm Citations JSON
+        // Lưu phản hồi của Assistant
         String citationsJson = "";
         try {
             citationsJson = objectMapper.writeValueAsString(pythonResponse.citations);
@@ -125,15 +169,17 @@ public class ChatServiceImpl implements ChatService {
 
         ChatMessage assistantMessage = ChatMessage.builder()
                 .sender("assistant")
+                .messageType(MessageType.AI_RESPONSE)
                 .text(pythonResponse.answer)
                 .space(space)
                 .condensedQuestion(pythonResponse.condensedQuestion)
                 .promptSent(pythonResponse.promptSent)
                 .citations(citationsJson)
+                .selectedDocumentIds(docIdsJson)
                 .build();
         chatMessageRepository.save(assistantMessage);
 
-        // 6.5. Kích hoạt tiến trình chạy ngầm để tóm tắt lịch sử hội thoại theo chu kỳ (Batching)
+        // Kích hoạt tóm tắt ngầm nếu đạt chu kỳ
         try {
             long assistantMsgCount = chatMessageRepository.countBySpaceIdAndSender(space.getId(), "assistant");
             if (assistantMsgCount > 0 && assistantMsgCount % SUMMARY_BATCH_INTERVAL == 0) {
@@ -157,14 +203,11 @@ public class ChatServiceImpl implements ChatService {
                         userSetting.getSummarizerModel(), 
                         fullHistoryForSummary
                 );
-            } else {
-                log.debug("Bỏ qua tóm tắt cho Space ID: {} (Lượt thứ {}/{})", space.getId(), assistantMsgCount % SUMMARY_BATCH_INTERVAL, SUMMARY_BATCH_INTERVAL);
             }
         } catch (Exception e) {
             log.error("Failed to trigger background chat summarization", e);
         }
 
-        // 7. Chuyển đổi Citations sang định dạng Response DTO
         List<SpaceChatResponse.SpaceCitation> responseCitations = new ArrayList<>();
         if (pythonResponse.citations != null) {
             responseCitations = pythonResponse.citations.stream()
@@ -189,6 +232,15 @@ public class ChatServiceImpl implements ChatService {
     @Override
     @Transactional(readOnly = true)
     public List<ChatMessageResponse> getSpaceChatHistory(Long spaceId) {
+        User currentUser = userService.getCurrentUser();
+        Space space = spaceRepository.findById(spaceId)
+                .orElseThrow(() -> new AppException(ErrorCode.SPACE_NOT_FOUND));
+
+        SpaceRole userRole = getUserRole(space, currentUser);
+        if (currentUser.getRole() != Role.ROLE_ADMIN && userRole == null) {
+            throw new AppException(ErrorCode.UNAUTHORIZED);
+        }
+
         List<ChatMessage> messages = chatMessageRepository.findBySpaceIdOrderByCreatedAtAsc(spaceId);
         return messages.stream().map(this::mapToResponse).toList();
     }
@@ -196,11 +248,18 @@ public class ChatServiceImpl implements ChatService {
     @Override
     @Transactional
     public void clearSpaceChatHistory(Long spaceId) {
+        User currentUser = userService.getCurrentUser();
+        Space space = spaceRepository.findById(spaceId)
+                .orElseThrow(() -> new AppException(ErrorCode.SPACE_NOT_FOUND));
+
+        SpaceRole userRole = getUserRole(space, currentUser);
+        if (currentUser.getRole() != Role.ROLE_ADMIN && userRole != SpaceRole.OWNER) {
+            throw new AppException(ErrorCode.SPACE_ACCESS_DENIED);
+        }
+
         chatMessageRepository.deleteBySpaceId(spaceId);
-        spaceRepository.findById(spaceId).ifPresent(space -> {
-            space.setChatSummary(null);
-            spaceRepository.save(space);
-        });
+        space.setChatSummary(null);
+        spaceRepository.save(space);
     }
 
     private ChatMessageResponse mapToResponse(ChatMessage msg) {
@@ -220,18 +279,46 @@ public class ChatServiceImpl implements ChatService {
                                 .build())
                         .toList();
             } catch (Exception e) {
-                log.error("Failed to deserialize citations from database for message ID: {}", msg.getId(), e);
+                log.error("Failed to deserialize citations for message ID: {}", msg.getId(), e);
             }
         }
+
+        List<Long> selectedDocIds = new ArrayList<>();
+        if (msg.getSelectedDocumentIds() != null && !msg.getSelectedDocumentIds().isBlank()) {
+            try {
+                selectedDocIds = objectMapper.readValue(msg.getSelectedDocumentIds(), new TypeReference<List<Long>>() {});
+            } catch (Exception e) {
+                log.warn("Failed to deserialize selectedDocumentIds for message ID: {}", msg.getId());
+            }
+        }
+
+        User u = msg.getUser();
+        String userName = u != null ? (u.getFullName() != null ? u.getFullName() : u.getUsername()) : null;
+        String userAvatar = u != null ? u.getAvatarUrl() : null;
+        Long userId = u != null ? u.getId() : null;
 
         return ChatMessageResponse.builder()
                 .id(msg.getId())
                 .sender(msg.getSender())
+                .messageType(msg.getMessageType())
                 .text(msg.getText())
+                .userId(userId)
+                .userName(userName)
+                .userAvatar(userAvatar)
                 .timestamp(msg.getCreatedAt())
                 .condensedQuestion(msg.getCondensedQuestion())
                 .promptSent(msg.getPromptSent())
                 .citations(responseCitations)
+                .selectedDocumentIds(selectedDocIds)
                 .build();
+    }
+
+    private SpaceRole getUserRole(Space space, User user) {
+        if (user == null || space == null) return null;
+        if (user.getRole() == Role.ROLE_ADMIN) return SpaceRole.OWNER;
+        if (space.getUser() != null && space.getUser().getId().equals(user.getId())) return SpaceRole.OWNER;
+
+        Optional<SpaceMember> memberOpt = spaceMemberRepository.findBySpaceIdAndUserId(space.getId(), user.getId());
+        return memberOpt.map(SpaceMember::getRole).orElse(null);
     }
 }

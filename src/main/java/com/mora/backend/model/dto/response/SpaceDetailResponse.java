@@ -1,5 +1,6 @@
 package com.mora.backend.model.dto.response;
 
+import com.mora.backend.model.entity.SpaceRole;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -18,5 +19,9 @@ public class SpaceDetailResponse {
     private String description;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+    private SpaceRole currentUserRole;
+    private int memberCount;
     private List<DocumentResponse> documents;
+    private List<SpaceMemberResponse> members;
+    private String ownerName;
 }

@@ -75,6 +75,8 @@ public class AiServiceClient {
         public Long spaceId;
         @JsonProperty("document_id")
         public Long documentId;
+        @JsonProperty("document_ids")
+        public List<Long> documentIds;
         public List<ContextItem> context;
         public List<HistoryItem> history;
         @JsonProperty("chat_summary")

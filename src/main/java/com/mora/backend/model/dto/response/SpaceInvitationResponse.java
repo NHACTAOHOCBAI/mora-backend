@@ -1,5 +1,6 @@
 package com.mora.backend.model.dto.response;
 
+import com.mora.backend.model.entity.InvitationStatus;
 import com.mora.backend.model.entity.SpaceRole;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -12,14 +13,15 @@ import java.time.LocalDateTime;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class SpaceResponse {
+public class SpaceInvitationResponse {
     private Long id;
-    private String name;
-    private String description;
+    private Long spaceId;
+    private String spaceName;
+    private String inviteCode;
+    private String inviteEmail;
+    private SpaceRole role;
+    private InvitationStatus status;
+    private LocalDateTime expiresAt;
     private LocalDateTime createdAt;
-    private LocalDateTime updatedAt;
-    private SpaceRole currentUserRole;
-    private int memberCount;
-    private int documentCount;
-    private String ownerName;
+    private String inviterName;
 }

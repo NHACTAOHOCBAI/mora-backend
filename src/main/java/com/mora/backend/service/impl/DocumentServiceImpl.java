@@ -2,13 +2,10 @@ package com.mora.backend.service.impl;
 
 import com.mora.backend.exception.AppException;
 import com.mora.backend.exception.ErrorCode;
-import com.mora.backend.model.entity.Document;
-import com.mora.backend.model.entity.DocumentStatus;
-import com.mora.backend.model.entity.Space;
-import com.mora.backend.model.entity.User;
-import com.mora.backend.model.entity.UserAiSetting;
+import com.mora.backend.model.entity.*;
 import com.mora.backend.repository.DocumentPageRepository;
 import com.mora.backend.repository.DocumentRepository;
+import com.mora.backend.repository.SpaceMemberRepository;
 import com.mora.backend.repository.SpaceRepository;
 import com.mora.backend.service.DocumentService;
 import com.mora.backend.service.StorageService;
@@ -20,6 +17,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -29,6 +27,7 @@ public class DocumentServiceImpl implements DocumentService {
     private final DocumentRepository documentRepository;
     private final DocumentPageRepository documentPageRepository;
     private final SpaceRepository spaceRepository;
+    private final SpaceMemberRepository spaceMemberRepository;
     private final StorageService storageService;
     private final DocumentAsyncProcessor documentAsyncProcessor;
     private final UserService userService;
@@ -49,6 +48,12 @@ public class DocumentServiceImpl implements DocumentService {
         Space space = spaceRepository.findById(spaceId)
                 .orElseThrow(() -> new AppException(ErrorCode.SPACE_NOT_FOUND));
 
+        SpaceRole userRole = getUserRole(space, currentUser);
+        if (currentUser.getRole() != Role.ROLE_ADMIN && (userRole == null || userRole == SpaceRole.VIEWER)) {
+            log.warn("User {} has role {} in space {}, cannot upload documents", currentUser.getUsername(), userRole, spaceId);
+            throw new AppException(ErrorCode.SPACE_ACCESS_DENIED);
+        }
+
         // 1. Create and save document metadata with status UPLOADING
         Document doc = Document.builder()
                 .name(name)
@@ -56,6 +61,7 @@ public class DocumentServiceImpl implements DocumentService {
                 .fileSize((long) content.length)
                 .contentType(contentType)
                 .space(space)
+                .uploadedBy(currentUser)
                 .status(DocumentStatus.UPLOADING)
                 .build();
         doc = documentRepository.save(doc);
@@ -94,6 +100,18 @@ public class DocumentServiceImpl implements DocumentService {
         Document doc = documentRepository.findById(documentId)
                 .orElseThrow(() -> new AppException(ErrorCode.DOCUMENT_NOT_FOUND));
 
+        User currentUser = userService.getCurrentUser();
+        Space space = doc.getSpace();
+        SpaceRole userRole = getUserRole(space, currentUser);
+
+        boolean isUploader = doc.getUploadedBy() != null && doc.getUploadedBy().getId().equals(currentUser.getId());
+        boolean isOwner = userRole == SpaceRole.OWNER || currentUser.getRole() == Role.ROLE_ADMIN;
+
+        if (!isOwner && !isUploader) {
+            log.warn("User {} is neither owner nor uploader of doc {}, deletion denied", currentUser.getUsername(), documentId);
+            throw new AppException(ErrorCode.SPACE_ACCESS_DENIED);
+        }
+
         // 1. Delete from storage
         String storageUrl = doc.getStorageUrl();
         if (storageUrl != null && !storageUrl.isBlank()) {
@@ -105,5 +123,14 @@ public class DocumentServiceImpl implements DocumentService {
         documentPageRepository.deleteByDocumentId(documentId);
         documentRepository.delete(doc);
         log.info("Deleted document and pages for ID: {}", documentId);
+    }
+
+    private SpaceRole getUserRole(Space space, User user) {
+        if (user == null || space == null) return null;
+        if (user.getRole() == Role.ROLE_ADMIN) return SpaceRole.OWNER;
+        if (space.getUser() != null && space.getUser().getId().equals(user.getId())) return SpaceRole.OWNER;
+
+        Optional<SpaceMember> memberOpt = spaceMemberRepository.findBySpaceIdAndUserId(space.getId(), user.getId());
+        return memberOpt.map(SpaceMember::getRole).orElse(null);
     }
 }

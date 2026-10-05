@@ -6,20 +6,16 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import java.util.List;
 
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class SpaceChatRequest {
+public class GroupChatMessageRequest {
+
     @NotNull(message = "Space ID không được để trống")
     private Long spaceId;
 
-    @NotBlank(message = "Câu hỏi không được để trống")
-    private String question;
-
-    private List<ChatMessageDto> history;
-
-    private List<Long> documentIds;
+    @NotBlank(message = "Nội dung tin nhắn không được để trống")
+    private String text;
 }

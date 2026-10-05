@@ -6,20 +6,18 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.time.LocalDateTime;
-
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class SpaceResponse {
-    private Long id;
-    private String name;
-    private String description;
-    private LocalDateTime createdAt;
-    private LocalDateTime updatedAt;
-    private SpaceRole currentUserRole;
+public class SpaceJoinPreviewResponse {
+    private Long spaceId;
+    private String spaceName;
+    private String spaceDescription;
+    private String inviterName;
+    private String inviterAvatar;
+    private SpaceRole role;
     private int memberCount;
     private int documentCount;
-    private String ownerName;
+    private boolean isAlreadyMember;
 }
