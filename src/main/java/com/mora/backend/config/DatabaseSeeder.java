@@ -31,30 +31,34 @@ public class DatabaseSeeder implements CommandLineRunner {
     private String adminFullName;
 
     @Override
-    public void run(String... args) throws Exception {
-        userRepository.findByUsername(adminUsername).ifPresentOrElse(
-            admin -> {
-                if (admin.getRole() != Role.ROLE_ADMIN) {
-                    admin.setRole(Role.ROLE_ADMIN);
-                    userRepository.save(admin);
-                    log.info("Successfully restored Admin role to user: {}", adminUsername);
-                } else {
-                    log.info("Admin user already has ROLE_ADMIN. Skipping restoration.");
-                }
-            },
-            () -> {
-                User admin = User.builder()
-                        .username(adminUsername)
-                        .password(passwordEncoder.encode(adminPassword))
-                        .email(adminEmail)
-                        .fullName(adminFullName)
-                        .role(Role.ROLE_ADMIN)
-                        .active(true)
-                        .build();
+    public void run(String... args) {
+        try {
+            userRepository.findByUsername(adminUsername).ifPresentOrElse(
+                admin -> {
+                    if (admin.getRole() != Role.ROLE_ADMIN) {
+                        admin.setRole(Role.ROLE_ADMIN);
+                        userRepository.save(admin);
+                        log.info("Successfully restored Admin role to user: {}", adminUsername);
+                    } else {
+                        log.info("Admin user already has ROLE_ADMIN. Skipping restoration.");
+                    }
+                },
+                () -> {
+                    User admin = User.builder()
+                            .username(adminUsername)
+                            .password(passwordEncoder.encode(adminPassword))
+                            .email(adminEmail)
+                            .fullName(adminFullName)
+                            .role(Role.ROLE_ADMIN)
+                            .active(true)
+                            .build();
 
-                userRepository.save(admin);
-                log.info("Successfully seeded default Admin user: {}", adminUsername);
-            }
-        );
+                    userRepository.save(admin);
+                    log.info("Successfully seeded default Admin user: {}", adminUsername);
+                }
+            );
+        } catch (Exception e) {
+            log.warn("DatabaseSeeder encountered an issue while seeding admin user: {}", e.getMessage());
+        }
     }
 }
