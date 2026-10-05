@@ -15,4 +15,6 @@ public interface SpaceRepository extends JpaRepository<Space, Long> {
 
     @Query("SELECT DISTINCT s FROM Space s LEFT JOIN SpaceMember sm ON sm.space = s WHERE s.user = :user OR sm.user = :user ORDER BY s.updatedAt DESC")
     List<Space> findAllAccessibleSpaces(@Param("user") User user);
+
+    boolean existsByIdAndUserId(Long id, Long userId);
 }

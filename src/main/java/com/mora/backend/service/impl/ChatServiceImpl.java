@@ -16,6 +16,7 @@ import com.mora.backend.service.UserAiSettingService;
 import com.mora.backend.service.UserService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -37,6 +38,7 @@ public class ChatServiceImpl implements ChatService {
     private final ChatSummaryHelper chatSummaryHelper;
     private final UserService userService;
     private final UserAiSettingService userAiSettingService;
+    private final SimpMessagingTemplate messagingTemplate;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     private static final int SUMMARY_BATCH_INTERVAL = 6;
@@ -63,7 +65,16 @@ public class ChatServiceImpl implements ChatService {
         userMessage = chatMessageRepository.save(userMessage);
 
         log.info("Saved group message from user {} in space {}", currentUser.getUsername(), space.getId());
-        return mapToResponse(userMessage);
+        ChatMessageResponse response = mapToResponse(userMessage);
+
+        try {
+            messagingTemplate.convertAndSend("/topic/spaces/" + space.getId() + "/messages", response);
+            log.info("[WebSocket] Broadcasted group message #{} to space #{}", userMessage.getId(), space.getId());
+        } catch (Exception e) {
+            log.warn("[WebSocket] Failed to broadcast group message: {}", e.getMessage());
+        }
+
+        return response;
     }
 
     @Override
@@ -139,7 +150,15 @@ public class ChatServiceImpl implements ChatService {
                 .selectedDocumentIds(docIdsJson)
                 .space(space)
                 .build();
-        chatMessageRepository.save(userMessage);
+        userMessage = chatMessageRepository.save(userMessage);
+
+        try {
+            ChatMessageResponse userQueryResponse = mapToResponse(userMessage);
+            messagingTemplate.convertAndSend("/topic/spaces/" + space.getId() + "/messages", userQueryResponse);
+            log.info("[WebSocket] Broadcasted user AI query #{} to space #{}", userMessage.getId(), space.getId());
+        } catch (Exception e) {
+            log.warn("[WebSocket] Failed to broadcast user AI query: {}", e.getMessage());
+        }
 
         // Gọi Python AI Service
         AiServiceClient.PythonChatRequest pythonRequest = new AiServiceClient.PythonChatRequest();
@@ -177,7 +196,15 @@ public class ChatServiceImpl implements ChatService {
                 .citations(citationsJson)
                 .selectedDocumentIds(docIdsJson)
                 .build();
-        chatMessageRepository.save(assistantMessage);
+        assistantMessage = chatMessageRepository.save(assistantMessage);
+
+        try {
+            ChatMessageResponse assistantResponse = mapToResponse(assistantMessage);
+            messagingTemplate.convertAndSend("/topic/spaces/" + space.getId() + "/messages", assistantResponse);
+            log.info("[WebSocket] Broadcasted assistant response #{} to space #{}", assistantMessage.getId(), space.getId());
+        } catch (Exception e) {
+            log.warn("[WebSocket] Failed to broadcast assistant response: {}", e.getMessage());
+        }
 
         // Kích hoạt tóm tắt ngầm nếu đạt chu kỳ
         try {
