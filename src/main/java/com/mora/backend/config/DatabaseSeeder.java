@@ -33,12 +33,17 @@ public class DatabaseSeeder implements CommandLineRunner {
     @Override
     public void run(String... args) {
         try {
-            userRepository.findByUsername(adminUsername).ifPresentOrElse(
+            java.util.Optional<User> adminOpt = userRepository.findByUsername(adminUsername);
+            if (adminOpt.isEmpty()) {
+                adminOpt = userRepository.findByEmail(adminEmail);
+            }
+            
+            adminOpt.ifPresentOrElse(
                 admin -> {
                     if (admin.getRole() != Role.ROLE_ADMIN) {
                         admin.setRole(Role.ROLE_ADMIN);
                         userRepository.save(admin);
-                        log.info("Successfully restored Admin role to user: {}", adminUsername);
+                        log.info("Successfully restored Admin role to user: {}", admin.getUsername());
                     } else {
                         log.info("Admin user already has ROLE_ADMIN. Skipping restoration.");
                     }
