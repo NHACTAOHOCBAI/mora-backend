@@ -5,6 +5,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
@@ -45,6 +46,16 @@ public class GlobalExceptionHandler {
             errorCode == ErrorCode.INVALID_KEY ? exception.getFieldError().getDefaultMessage() : errorCode.getMessage()
         );
 
+        return ResponseEntity.status(errorCode.getStatusCode()).body(apiResponse);
+    }
+
+    // Bắt lỗi upload file vượt quá kích thước cho phép
+    @ExceptionHandler(value = MaxUploadSizeExceededException.class)
+    public ResponseEntity<ApiResponse<Object>> handleMaxUploadSizeExceededException(MaxUploadSizeExceededException exception) {
+        ErrorCode errorCode = ErrorCode.DOCUMENT_TOO_LARGE;
+        ApiResponse<Object> apiResponse = new ApiResponse<>();
+        apiResponse.setCode(errorCode.getCode());
+        apiResponse.setMessage(errorCode.getMessage());
         return ResponseEntity.status(errorCode.getStatusCode()).body(apiResponse);
     }
 }

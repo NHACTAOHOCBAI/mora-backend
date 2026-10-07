@@ -65,17 +65,25 @@ public class DocumentServiceImpl implements DocumentService {
                 .status(DocumentStatus.UPLOADING)
                 .build();
         doc = documentRepository.save(doc);
+        final Long documentId = doc.getId();
 
-        // 2. Trigger asynchronous processing
-        documentAsyncProcessor.processDocumentAsync(
-                doc.getId(), 
-                spaceId, 
-                content, 
-                name, 
-                contentType,
-                currentUser.getId(),
-                userSetting.getGeminiApiKey(),
-                userSetting.getParserModel()
+        // 2. Trigger asynchronous processing AFTER transaction commits
+        org.springframework.transaction.support.TransactionSynchronizationManager.registerSynchronization(
+            new org.springframework.transaction.support.TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    documentAsyncProcessor.processDocumentAsync(
+                            documentId, 
+                            spaceId, 
+                            content, 
+                            name, 
+                            contentType,
+                            currentUser.getId(),
+                            userSetting.getGeminiApiKey(),
+                            userSetting.getParserModel()
+                    );
+                }
+            }
         );
 
         return doc;

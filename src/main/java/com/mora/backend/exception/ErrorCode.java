@@ -31,7 +31,8 @@ public enum ErrorCode {
     INVITATION_NOT_FOUND(1023, "Mã mời không tồn tại hoặc đã hết hiệu lực", HttpStatus.NOT_FOUND),
     INVITATION_EXPIRED(1024, "Mã mời đã hết hạn", HttpStatus.BAD_REQUEST),
     CANNOT_REMOVE_OWNER(1025, "Không thể xóa chủ sở hữu Không gian học tập", HttpStatus.BAD_REQUEST),
-    SPACE_ACCESS_DENIED(1026, "Bạn không có quyền thực hiện hành động này trong Không gian học tập", HttpStatus.FORBIDDEN)
+    SPACE_ACCESS_DENIED(1026, "Bạn không có quyền thực hiện hành động này trong Không gian học tập", HttpStatus.FORBIDDEN),
+    DOCUMENT_TOO_LARGE(1027, "Kích thước tài liệu không được vượt quá 15MB", HttpStatus.PAYLOAD_TOO_LARGE)
     ;
 
     private final int code;
