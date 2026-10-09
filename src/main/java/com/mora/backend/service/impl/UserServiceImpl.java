@@ -26,6 +26,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -108,6 +109,35 @@ public class UserServiceImpl implements UserService {
             log.warn("Login failed for user: {}. Reason: {}", request.getUsername(), e.getMessage());
             throw new AppException(ErrorCode.UNAUTHENTICATED);
         }
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public AuthResponse impersonateUser(Long id) {
+        log.info("Admin impersonating user ID: {}", id);
+
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+
+        if (!user.isActive()) {
+            throw new AppException(ErrorCode.UNAUTHENTICATED);
+        }
+
+        UserDetails userDetails = new org.springframework.security.core.userdetails.User(
+                user.getUsername(),
+                user.getPassword(),
+                List.of(new SimpleGrantedAuthority(user.getRole().name()))
+        );
+
+        String token = jwtTokenProvider.generateToken(userDetails);
+
+        return AuthResponse.builder()
+                .token(token)
+                .username(user.getUsername())
+                .email(user.getEmail())
+                .fullName(user.getFullName())
+                .role(user.getRole())
+                .build();
     }
 
     @Override

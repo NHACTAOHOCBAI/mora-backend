@@ -24,4 +24,5 @@ public interface UserService {
     UserResponse updateProfile(UpdateProfileRequest request);
     UserResponse updateAvatar(MultipartFile file);
     void changePassword(ChangePasswordRequest request);
+    AuthResponse impersonateUser(Long id);
 }

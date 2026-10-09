@@ -58,4 +58,15 @@ public class AdminUserController {
                         .build()
         );
     }
+
+    @PostMapping("/{id}/impersonate")
+    public ResponseEntity<ApiResponse<com.mora.backend.model.dto.response.AuthResponse>> impersonateUser(@PathVariable Long id) {
+        com.mora.backend.model.dto.response.AuthResponse response = userService.impersonateUser(id);
+        return ResponseEntity.ok(
+                ApiResponse.<com.mora.backend.model.dto.response.AuthResponse>builder()
+                        .message("Đăng nhập bằng quyền Admin thành công")
+                        .result(response)
+                        .build()
+        );
+    }
 }
