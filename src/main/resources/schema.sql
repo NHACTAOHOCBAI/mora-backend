@@ -93,39 +93,3 @@ CREATE TABLE IF NOT EXISTS user_ai_daily_usages (
     token_count INT DEFAULT 0,
     UNIQUE(user_id, usage_date)
 );
-
-CREATE TABLE IF NOT EXISTS benchmark_questions (
-    id BIGSERIAL PRIMARY KEY,
-    space_id BIGINT NOT NULL REFERENCES spaces(id) ON DELETE CASCADE,
-    document_id BIGINT REFERENCES documents(id) ON DELETE SET NULL,
-    question TEXT NOT NULL,
-    ground_truth TEXT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE TABLE IF NOT EXISTS benchmark_runs (
-    id BIGSERIAL PRIMARY KEY,
-    space_id BIGINT NOT NULL REFERENCES spaces(id) ON DELETE CASCADE,
-    approach_name VARCHAR(100) NOT NULL,
-    faithfulness DOUBLE PRECISION,
-    answer_relevance DOUBLE PRECISION,
-    context_precision DOUBLE PRECISION,
-    context_recall DOUBLE PRECISION,
-    avg_latency_ms BIGINT,
-    status VARCHAR(20) NOT NULL DEFAULT 'RUNNING',
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE TABLE IF NOT EXISTS benchmark_run_details (
-    id BIGSERIAL PRIMARY KEY,
-    benchmark_run_id BIGINT NOT NULL REFERENCES benchmark_runs(id) ON DELETE CASCADE,
-    question TEXT NOT NULL,
-    retrieved_contexts TEXT,
-    generated_answer TEXT,
-    ground_truth TEXT,
-    latency_ms BIGINT,
-    faithfulness DOUBLE PRECISION,
-    answer_relevance DOUBLE PRECISION,
-    context_precision DOUBLE PRECISION,
-    context_recall DOUBLE PRECISION
-);

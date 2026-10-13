@@ -1,168 +1,136 @@
-# 🌟 Mora Backend - Nền tảng Mạng xã hội Học tập Tích hợp AI
+# Mora Backend
 
-Mora Backend là dịch vụ máy chủ được phát triển trên nền tảng **Java Spring Boot**, đóng vai trò xử lý logic nghiệp vụ, quản lý cơ sở dữ liệu và tích hợp lưu trữ đám mây cho dự án **Mora - AI-Powered Social Learning Network** (Mạng xã hội học tập nhóm tích hợp AI thế hệ mới với cơ chế Source-Grounded AI tương tự NotebookLM).
+Backend Spring Boot của Mora. Service này cung cấp REST API, xác thực JWT, WebSocket thời gian thực và điều phối dữ liệu giữa web client, PostgreSQL, lưu trữ tệp và AI Service.
 
-Dự án hiện tại hỗ trợ các tính năng cốt lõi cho **Giai đoạn 1**: Pipeline xử lý tài liệu, bóc tách nội dung PDF theo trang, tích hợp hệ thống lưu trữ Cloud Storage (Supabase), cơ sở dữ liệu PostgreSQL, và kết nối tích hợp mô hình AI Gemini thông qua Python microservice `mora-ai` hỗ trợ hỏi đáp kèm định vị nguồn trích dẫn và lưu trữ lịch sử cuộc trò chuyện.
+## Kiến trúc hệ thống
 
----
+```mermaid
+flowchart LR
+  FE[React Frontend] -->|REST /api + JWT| BE[Spring Boot\n:8080]
+  FE <-->|STOMP/WebSocket| BE
+  BE --> PG[(PostgreSQL\n:5433)]
+  BE --> R2[Cloudflare R2\nTài liệu tải lên]
+  BE -->|HTTP| AI[FastAPI AI Service\n:8000]
+  AI --> Q[(Qdrant\n:6333 / :6334)]
+  AI --> Gemini[Google Gemini]
+```
 
-## 🛠️ Công nghệ Sử dụng (Tech Stack)
+Khi người dùng tải tài liệu, Backend lưu metadata và tệp, sau đó xử lý bất đồng bộ: gọi AI Service để phân tích PDF, chunk/index nội dung vào Qdrant. Khi chat, Backend xác thực người dùng, chuyển yêu cầu phù hợp tới AI Service và phát các sự kiện space qua WebSocket.
 
-*   **Java 26** - Phiên bản Java LTS mới nhất với các tối ưu hóa hiệu năng vượt trội.
-*   **Spring Boot 4.1.0** - Framework chính quản lý API, Dependency Injection, Validation.
-*   **Spring Data JPA / Hibernate** - Tương tác và ánh xạ cơ sở dữ liệu quan hệ.
-*   **PostgreSQL 16** - Hệ quản trị cơ sở dữ liệu quan hệ chính.
-*   **Supabase Storage** - Giải pháp lưu trữ Cloud Object Storage quản lý tệp tin tài liệu gốc.
-*   **Apache PDFBox 3.0.3** - Thư viện bóc tách và phân tích dữ liệu văn bản từ file PDF theo trang.
-*   **RestTemplate** - HTTP Client trong Spring Boot dùng để kết nối với Python AI Service (`mora-ai`).
-*   **Lombok** - Tự sinh code Boilerplate (Constructor, Getter/Setter, Builder, Logging).
-*   **Springdoc OpenAPI v2.8.5** - Tự động sinh tài liệu API (Swagger UI).
+## Công nghệ và thành phần
 
----
-
-## 📂 Cấu trúc Thư mục (Package Structure)
-
-Dự án tuân thủ mô hình **Package-by-Layer** kết hợp phân tách logic nghiệp vụ theo quy chuẩn phát triển:
+- Java 26, Spring Boot 4, Maven Wrapper.
+- Spring Web MVC, Validation, Spring Data JPA, PostgreSQL và Hibernate.
+- Spring Security + JWT cho xác thực; STOMP/WebSocket cho chat nhóm.
+- Springdoc OpenAPI/Swagger, PDFBox, AWS SDK S3 tương thích Cloudflare R2.
 
 ```text
-com.mora.backend
-├── client/             # Các Client gọi dịch vụ ngoài (AiServiceClient kết nối tới mora-ai)
-├── config/             # Cấu hình Spring Boot (CORS, OpenApi, Jackson, JPA...)
-├── controller/         # REST API Controllers (Nhận/trả dữ liệu và điều hướng, không xử lý logic)
-├── exception/          # Quản lý và xử lý lỗi tập trung toàn cục (Global Exception Handler)
-├── model/              # Quản lý cấu trúc dữ liệu
-│   ├── entity/         # Đối tượng Entity ánh xạ trực tiếp xuống DB (Document, DocumentPage, ChatMessage...)
-│   └── dto/            # Data Transfer Object (DTO)
-│       ├── request/    # DTO nhận từ REST Client
-│       └── response/   # DTO trả về REST Client
-├── repository/         # Tầng kết nối & truy vấn Cơ sở dữ liệu (Spring Data JPA)
-├── service/            # Tầng xử lý nghiệp vụ chính (Business Logic)
-│   ├── DocumentService.java
-│   ├── StorageService.java
-│   ├── ChatService.java
-│   ├── SpaceService.java
-│   └── impl/           # Hiện thực chi tiết (DocumentServiceImpl, ChatServiceImpl, SpaceServiceImpl...)
-└── util/               # Các class tiện ích dùng chung
+src/main/java/com/mora/backend/
+├── controller/  # REST endpoint
+├── service/     # Interface và nghiệp vụ; impl/ là hiện thực
+├── repository/  # JPA repository
+├── model/       # Entity và DTO request/response/event
+├── security/    # JWT, UserDetails, WebSocket auth
+├── config/      # Security, CORS, OpenAPI, storage, seed dữ liệu
+├── client/      # HTTP client gọi AI Service
+└── exception/   # Lỗi nghiệp vụ và error handler
 ```
 
----
+Các nhóm API chính nằm dưới `/api`: `auth`, `users`, `documents`, `spaces`, `chat`, `admin` và `user/ai-settings`. Xem danh sách API theo code hiện hành tại Swagger: `http://localhost:8080/swagger-ui.html`.
 
-## 🚀 Tính năng Hiện tại (Current Features)
+## Điều phối chatbot
 
-1.  **Pipeline Xử lý PDF:**
-    *   Tải tài liệu gốc định dạng PDF lên Supabase Cloud Storage.
-    *   Sử dụng **Apache PDFBox** để bóc tách nội dung văn bản (text extraction) độc lập theo từng trang (Page-by-page mapping).
-    *   Lưu thông tin metadata của tài liệu và nội dung chi tiết từng trang vào PostgreSQL.
-    *   **Phát hiện Vector Graphics và Image:** Nhận diện các trang chứa sơ đồ vector thông qua bộ đếm nét vẽ và so sánh với ngưỡng `vectorPathThreshold` cấu hình trên từng tài liệu (mặc định là 30, tùy chỉnh linh hoạt từ 5 đến 200).
-2.  **Tích hợp AI Engine (Python microservice `mora-ai` & Gemini SDK):**
-    *   **Hỏi đáp Source-Grounded (RAG):** Gửi yêu cầu qua `AiServiceClient` sang Python Server để hỏi đáp dựa trên ngữ cảnh tài liệu (độc lập hoặc toàn bộ Space).
-    *   **Trình bày So sánh Dạng Bảng (Markdown Table Comparisons):** Tự động sinh nội dung so sánh, phân biệt và đối chiếu dưới định dạng bảng Markdown có chèn ký tự xuống dòng thực tế ở cuối mỗi hàng khi người dùng hỏi dạng so sánh.
-    *   **Trích dẫn trang (Citations):** Gemini trả về danh sách trích dẫn (quote gốc trong file PDF, số trang, mã tài liệu) qua cấu trúc JSON chuẩn.
-    *   **Rút gọn câu hỏi (Condense Question):** Tự động gom lịch sử trò chuyện và câu hỏi mới thành một câu độc lập trên Python Server trước khi gửi cho LLM.
-    *   **Đọc hiểu hình ảnh (Multimodal Vision Engine):** Tự động phát hiện các trang PDF chứa ảnh/sơ đồ vector, kết xuất thành ảnh ảo JPEG rồi gửi dữ liệu Base64 qua Python Server để Gemini xử lý dạng binary/inlineData.
-    *   **Trình gỡ lỗi Prompt (Prompt Debugger):** Lưu vết toàn bộ nội dung prompt chính xác gửi đi vào cơ sở dữ liệu (`prompt_sent`). Hỗ trợ hiển thị trực quan prompt gốc kèm hình ảnh trong hộp thoại trên Frontend.
-    *   **Công cụ học tập thông minh (Study Helper):** Tạo bản Tóm tắt (Summary) học thuật và bộ flashcards thông qua Python AI Service.
-    *   **Xử lý lưu trữ bền bỉ (Robust Delete):** Cơ chế xóa file thông minh, tự động dọn dẹp sạch sẽ tài liệu và các trang liên quan trong cơ sở dữ liệu.
-3.  **Bảo mật & Phân quyền (Security & JWT):**
-    *   Tích hợp **Spring Security** với cơ chế xác thực không lưu trạng thái (Stateless) sử dụng **JWT Token**.
-    *   Phân chia vai trò rõ ràng: Người dùng thường (`ROLE_USER`) và Quản trị viên (`ROLE_ADMIN`).
-    *   Khởi tạo tự động tài khoản Admin mặc định thông qua database seeder (`DatabaseSeeder.java`).
-4.  **Đánh Giá Chất Lượng RAG (Ragas Benchmark):**
-    *   **Golden Dataset:** Quản lý tập câu hỏi chuẩn gồm các câu hỏi và đáp án mẫu (Ground Truth).
-    *   **Đánh giá tự động bằng Ragas:** Chạy đánh giá RAG dựa trên các chỉ số nâng cao (Faithfulness, Answer Relevance, Context Precision, Context Recall) bằng cách phối hợp với AI Service.
-    *   **So sánh hiệu năng:** Giao diện so sánh trực quan hiệu năng giữa các lần chạy thử nghiệm khác nhau dưới dạng biểu đồ cột và bảng so sánh ngữ cảnh/câu trả lời chi tiết cho từng câu hỏi.
+Backend là lớp bảo mật, lưu vết và realtime của chatbot; Frontend không gọi AI Service trực tiếp.
 
----
+1. `POST /api/chat/space` xác thực JWT, lấy người dùng hiện tại, kiểm tra quyền thành viên của space (admin được phép) và yêu cầu người dùng đã cấu hình Gemini API key.
+2. Backend lấy các trang thuộc document được chọn, lịch sử do client gửi và bản tóm tắt hội thoại của space; sau đó lưu câu hỏi với loại `AI_QUERY` vào PostgreSQL.
+3. Câu hỏi được broadcast tới `/topic/spaces/{spaceId}/messages`, rồi `AiServiceClient` gọi `POST /api/chat` của AI Service với API key/model theo cài đặt người dùng.
+4. Khi nhận phản hồi, Backend lưu `AI_RESPONSE`, citation, câu hỏi đã cô đọng, prompt đã gửi và document đã chọn; phản hồi này lại được broadcast tới cùng topic.
+5. Sau mỗi 6 phản hồi assistant trong một space, Backend kích hoạt tác vụ tóm tắt hội thoại để cập nhật context dùng ở các lượt sau.
 
-## 📋 Tài liệu API (API Documents)
+Chat nhóm không đi qua AI: `POST /api/chat/space/message` chỉ kiểm tra quyền, lưu message và broadcast. Lịch sử được lấy qua `GET /api/chat/space/{spaceId}`; chỉ OWNER hoặc ADMIN được xóa qua `DELETE /api/chat/space/{spaceId}`.
 
-Sau khi khởi chạy ứng dụng thành công, tài liệu Swagger UI sẽ khả dụng tại:
-👉 **[http://localhost:8080/swagger-ui.html](http://localhost:8080/swagger-ui.html)**
+WebSocket dùng STOMP tại `/ws`. Khi `CONNECT`, `WebSocketAuthInterceptor` xác thực JWT từ header `Authorization`; khi `SUBSCRIBE`, interceptor kiểm tra người dùng là chủ sở hữu/thành viên space hoặc admin trước khi cho phép theo dõi `/topic/spaces/{spaceId}/...`. Client cũng có thể gửi typing indicator tới `/app/spaces/{spaceId}/typing`.
 
-### Các Endpoint chính:
-*   `POST /api/auth/register` - Đăng ký tài khoản mới.
-*   `POST /api/auth/login` - Đăng nhập hệ thống nhận JWT Token.
-*   `GET /api/users/me` - Lấy thông tin tài khoản hiện tại.
-*   `PUT /api/users/profile` - Cập nhật thông tin cá nhân.
-*   `PUT /api/users/profile/password` - Thay đổi mật khẩu.
-*   `POST /api/documents/upload` - Tải lên file PDF và bóc tách nội dung từng trang.
-*   `GET /api/documents/{id}` - Lấy thông tin chi tiết tài liệu kèm các trang.
-*   `DELETE /api/documents/{id}` - Xóa tài liệu khỏi hệ thống.
-*   `POST /api/documents/{id}/generate-study-notes` - Sinh tóm tắt & Flashcards cho tài liệu bằng AI.
-*   `PATCH /api/documents/{id}/rename` - Đổi tên tài liệu.
-*   `GET /api/documents/{id}/debug-images` - Debug xem danh sách hình ảnh trích xuất của từng trang.
-*   `GET /api/documents/{id}/pages/{pageNumber}/images/{imageName}` - Tải/trích xuất ảnh gốc từ trang PDF dưới dạng PNG.
-*   `PATCH /api/documents/{id}/threshold` - Cập nhật cấu hình ngưỡng Vector Path và tự động quét lại toàn bộ hình ảnh trong tài liệu.
-*   `POST /api/chat` - Hỏi đáp với tài liệu cụ thể.
-*   `POST /api/chat/space` - Hỏi đáp trên toàn bộ Không gian học tập (nhiều tài liệu).
-*   `GET /api/chat/document/{documentId}` - Lấy lịch sử chat của tài liệu.
-*   `GET /api/chat/space/{spaceId}` - Lấy lịch sử chat của Space.
-*   `DELETE /api/chat/document/{documentId}` - Xóa lịch sử chat của tài liệu.
-*   `DELETE /api/chat/space/{spaceId}` - Xóa lịch sử chat của Space.
-*   `POST /api/admin/benchmarks/questions` - Tạo câu hỏi kiểm thử mới.
-*   `GET /api/admin/benchmarks/questions` - Danh sách câu hỏi kiểm thử.
-*   `PUT /api/admin/benchmarks/questions/{id}` - Sửa câu hỏi kiểm thử.
-*   `DELETE /api/admin/benchmarks/questions/{id}` - Xóa câu hỏi kiểm thử.
-*   `POST /api/admin/benchmarks/run` - Thực thi lượt chạy đánh giá Ragas Benchmark.
-*   `GET /api/admin/benchmarks/runs` - Lấy danh sách lịch sử các lượt chạy.
-*   `GET /api/admin/benchmarks/runs/{id}` - Chi tiết lượt chạy kèm điểm số của từng câu hỏi.
-*   `DELETE /api/admin/benchmarks/runs/{id}` - Xóa lượt chạy đánh giá.
+```mermaid
+sequenceDiagram
+  participant FE as Frontend
+  participant BE as ChatService
+  participant DB as PostgreSQL
+  participant AI as AI Service
+  participant WS as STOMP topic
 
----
+  FE->>BE: POST /api/chat/space + JWT
+  BE->>DB: Kiểm tra user, space, key và lưu AI_QUERY
+  BE-->>WS: Broadcast câu hỏi
+  BE->>AI: POST /api/chat (context, history, model, key)
+  AI-->>BE: answer + citations + metadata
+  BE->>DB: Lưu AI_RESPONSE và metadata
+  BE-->>WS: Broadcast phản hồi AI
+```
 
-## 🛠️ Hướng dẫn Cài đặt & Chạy ứng dụng
+Chi tiết về Router/Retrieval/Synthesis/Evaluator, RAG và fallback nằm tại [kiến trúc chatbot của AI Service](../mora-ai/README.md#kiến-trúc-chatbot).
 
-### 1. Yêu cầu Hệ thống
-*   Đã cài đặt **Java JDK 26**.
-*   Đã cài đặt **Maven 3.9+**.
-*   Đã cài đặt **Docker** & **Docker Compose**.
+## Yêu cầu
 
-### 2. Khởi chạy Database & Công cụ quản trị (pgAdmin)
-Dự án sử dụng PostgreSQL chạy trong Docker container thông qua file `docker-compose.yml` ở cổng `5433`, đi kèm công cụ quản trị **pgAdmin 4** ở cổng `5050`:
+- JDK 26 (phiên bản được khai báo trong `pom.xml`).
+- Docker và Docker Compose để chạy PostgreSQL + Qdrant local.
+- AI Service đang chạy tại `http://localhost:8000` nếu dùng chức năng AI/document.
+
+## Cấu hình môi trường
+
+Sao chép file mẫu rồi thay giá trị thật:
 
 ```bash
-docker compose up -d
+cp .env.example .env
 ```
 
-*   **PostgreSQL:** Hoạt động trên cổng `5433` (`localhost:5433`).
-*   **pgAdmin 4:** Truy cập tại **[http://localhost:5050](http://localhost:5050)**.
-    *   **Tài khoản đăng nhập:** Email `admin@mora.com` / Mật khẩu `admin`
-    *   **Kết nối Database từ pgAdmin:** Sử dụng Host name `postgres`, Port `5432`, Maintenance database `mora_db`, Username `postgres`, Password `postgres`.
+Các biến bắt buộc cho local:
 
-### 3. Cấu hình Ứng dụng
-Tạo file `.env` ở thư mục gốc của backend (hoặc cấu hình các biến môi trường trực tiếp) dựa trên file `.env.example`:
-
-```properties
+```env
 DB_URL=jdbc:postgresql://localhost:5433/mora_db
 DB_USERNAME=postgres
 DB_PASSWORD=postgres
-SUPABASE_URL=https://your-supabase-project.supabase.co
-SUPABASE_KEY=your-supabase-service-role-key
-SUPABASE_BUCKET=mora-documents
-GEMINI_API_KEY=your-gemini-api-key
-GEMINI_MODEL_NAME=gemini-1.5-flash
-GEMINI_TEMPERATURE=0.0
+GEMINI_API_KEY=your_key
 ```
 
-### 4. Khởi chạy Ứng dụng
-Sử dụng Maven Wrapper có sẵn để chạy ứng dụng:
+Các biến tùy chọn gồm `PORT` (mặc định `8080`), `AI_SERVICE_URL` (mặc định `http://localhost:8000`) và cấu hình R2: `R2_ENDPOINT`, `R2_ACCESS_KEY`, `R2_SECRET_KEY`, `R2_BUCKET`, `R2_PUBLIC_URL`. Không commit `.env`.
 
-*   **Windows (Command Prompt/PowerShell):**
-    ```bash
-    .\mvnw.cmd spring-boot:run
-    ```
-*   **Linux/macOS:**
-    ```bash
-    chmod +x mvnw
-    ./mvnw spring-boot:run
-    ```
+## Chạy local
 
----
+1. Khởi động PostgreSQL và Qdrant:
 
-## ✍️ Quy tắc Code (Coding Rules)
+   ```bash
+   docker compose up -d
+   ```
 
-Khi tham gia đóng góp mã nguồn cho dự án, vui lòng tuân thủ các nguyên tắc được định nghĩa chi tiết tại [rule.md](file:///c:/Users/phucnd/Desktop/Mora/mora-backend/rule.md):
-*   **Dependency Injection:** Tuyệt đối **KHÔNG** dùng `@Autowired` trực tiếp trên Field. Hãy dùng **Constructor Injection** (Khuyên dùng `@RequiredArgsConstructor` kết hợp thuộc tính `final`).
-*   **Request/Response & DTO:** Controller **KHÔNG** nhận hoặc trả về trực tiếp các Entity. Phải thông qua các đối tượng DTO chuyên biệt.
-*   **Transaction:** Đặt `@Transactional` ở tầng Service Implementation. Các phương thức đọc dữ liệu nên dùng `@Transactional(readOnly = true)`.
-*   **Logging:** Dùng `@Slf4j` từ Lombok để ghi nhận nhật ký hệ thống.
+   PostgreSQL được mở ở cổng `5433`; Qdrant dùng HTTP `6333` và gRPC `6334`.
+
+2. Khởi động AI Service theo hướng dẫn ở [`../mora-ai/README.md`](../mora-ai/README.md).
+
+3. Chạy Backend:
+
+   ```bash
+   chmod +x mvnw
+   ./mvnw spring-boot:run
+   ```
+
+Backend sẽ lắng nghe tại `http://localhost:8080`. Schema SQL được khởi tạo tự động; Hibernate tiếp tục cập nhật schema theo cấu hình hiện tại.
+
+Lệnh kiểm tra/build:
+
+```bash
+./mvnw test
+./mvnw clean package
+```
+
+## Chạy bằng Docker image
+
+`Dockerfile` đóng gói riêng Backend theo multi-stage build. Hạ tầng PostgreSQL/Qdrant vẫn do `docker-compose.yml` quản lý:
+
+```bash
+docker build -t mora-backend .
+docker run --env-file .env -p 8080:8080 mora-backend
+```
+
+Container cần truy cập được database, Qdrant và AI Service theo các URL đã cấu hình.

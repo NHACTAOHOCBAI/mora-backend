@@ -21,54 +21,6 @@ public class AiServiceClient {
     @Value("${ai-service.url:http://localhost:8000}")
     private String aiServiceUrl;
 
-    public static class PythonEvaluationResponse {
-        public String approachName;
-        public Double faithfulness;
-        public Double answerRelevance;
-        public Double contextPrecision;
-        public Double contextRecall;
-        public Long avgLatencyMs;
-        public List<Detail> details;
-
-        public static class Detail {
-            public String question;
-            @JsonProperty("retrieved_contexts")
-            public String retrievedContexts;
-            @JsonProperty("generated_answer")
-            public String generatedAnswer;
-            public String groundTruth;
-            public Long latencyMs;
-            public Double faithfulness;
-            public Double answerRelevance;
-            public Double contextPrecision;
-            public Double contextRecall;
-        }
-    }
-
-    public PythonEvaluationResponse evaluateBenchmark(String approachName, List<Map<String, String>> dataset) {
-        String url = aiServiceUrl + "/api/benchmark/evaluate";
-        Map<String, Object> request = Map.of(
-                "approach_name", approachName,
-                "dataset", dataset
-        );
-        try {
-            PythonEvaluationResponse response = restTemplate.postForObject(url, request, PythonEvaluationResponse.class);
-            if (response != null && response.details != null) {
-                for (var d : response.details) {
-                    log.info("Python evaluation detail: question='{}', generatedAnswer='{}', retrievedContexts='{}', groundTruth='{}'", 
-                            d.question, d.generatedAnswer, d.retrievedContexts, d.groundTruth);
-                }
-            }
-            return response;
-        } catch (org.springframework.web.client.HttpStatusCodeException e) {
-            log.error("Failed to call Python AI service /api/benchmark/evaluate. Error response: {}", e.getResponseBodyAsString(), e);
-            throw new AppException(ErrorCode.AI_ENGINE_ERROR);
-        } catch (Exception e) {
-            log.error("Failed to call Python AI service /api/benchmark/evaluate", e);
-            throw new AppException(ErrorCode.AI_ENGINE_ERROR);
-        }
-    }
-
     public static class PythonChatRequest {
         public String question;
         @JsonProperty("space_id")
