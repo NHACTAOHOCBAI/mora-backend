@@ -6,7 +6,7 @@ import lombok.Getter;
 @Getter
 public enum ErrorCode {
     UNCATEGORIZED_EXCEPTION(9999, "Lỗi không xác định", HttpStatus.INTERNAL_SERVER_ERROR),
-    INVALID_KEY(1001, "Uncategorized error key", HttpStatus.BAD_REQUEST),
+    INVALID_KEY(1001, "Dữ liệu yêu cầu không hợp lệ", HttpStatus.BAD_REQUEST),
     USER_EXISTED(1002, "Người dùng đã tồn tại", HttpStatus.BAD_REQUEST),
     USERNAME_INVALID(1003, "Tên đăng nhập không hợp lệ", HttpStatus.BAD_REQUEST),
     INVALID_PASSWORD(1004, "Mật khẩu không hợp lệ", HttpStatus.BAD_REQUEST),
@@ -15,7 +15,7 @@ public enum ErrorCode {
     UNAUTHORIZED(1007, "Bạn không có quyền truy cập chức năng này", HttpStatus.FORBIDDEN),
     DOCUMENT_NOT_FOUND(1008, "Không tìm thấy tài liệu", HttpStatus.NOT_FOUND),
     FILE_UPLOAD_FAILED(1009, "Tải file lên hệ thống thất bại", HttpStatus.INTERNAL_SERVER_ERROR),
-    INVALID_FILE_FORMAT(1010, "Định dạng file không hợp lệ, chỉ hỗ trợ PDF và hình ảnh (PNG, JPG, JPEG)", HttpStatus.BAD_REQUEST),
+    INVALID_FILE_FORMAT(1010, "Định dạng tệp không hợp lệ, chỉ hỗ trợ PDF", HttpStatus.BAD_REQUEST),
     SPACE_NOT_FOUND(1011, "Không tìm thấy Không gian học tập", HttpStatus.NOT_FOUND),
     PDF_PROCESSING_FAILED(1012, "Lỗi bóc tách hoặc xử lý tài liệu PDF", HttpStatus.INTERNAL_SERVER_ERROR),
     AI_ENGINE_ERROR(1013, "Lỗi từ công cụ AI (Gemini Engine)", HttpStatus.INTERNAL_SERVER_ERROR),
@@ -30,7 +30,10 @@ public enum ErrorCode {
     INVITATION_EXPIRED(1024, "Mã mời đã hết hạn", HttpStatus.BAD_REQUEST),
     CANNOT_REMOVE_OWNER(1025, "Không thể xóa chủ sở hữu Không gian học tập", HttpStatus.BAD_REQUEST),
     SPACE_ACCESS_DENIED(1026, "Bạn không có quyền thực hiện hành động này trong Không gian học tập", HttpStatus.FORBIDDEN),
-    DOCUMENT_TOO_LARGE(1027, "Kích thước tài liệu không được vượt quá 15MB", HttpStatus.PAYLOAD_TOO_LARGE)
+    DOCUMENT_TOO_LARGE(1027, "Kích thước tài liệu không được vượt quá 15MB", HttpStatus.PAYLOAD_TOO_LARGE),
+    MALFORMED_REQUEST(1028, "Dữ liệu gửi lên không đúng định dạng", HttpStatus.BAD_REQUEST),
+    MISSING_REQUEST_DATA(1029, "Thiếu thông tin bắt buộc", HttpStatus.BAD_REQUEST),
+    INVALID_REQUEST_PARAMETER(1030, "Tham số yêu cầu không hợp lệ", HttpStatus.BAD_REQUEST)
     ;
 
     private final int code;

@@ -2,6 +2,8 @@ package com.mora.backend.controller;
 
 import com.mora.backend.model.dto.response.ApiResponse;
 import com.mora.backend.model.dto.response.DocumentResponse;
+import com.mora.backend.exception.AppException;
+import com.mora.backend.exception.ErrorCode;
 import com.mora.backend.model.entity.Document;
 import com.mora.backend.service.DocumentService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -28,10 +30,18 @@ public class DocumentController {
     public ResponseEntity<ApiResponse<DocumentResponse>> uploadDocument(
             @RequestParam("spaceId") Long spaceId,
             @RequestParam("file") MultipartFile file) throws IOException {
+        String fileName = file.getOriginalFilename();
+        if (file.isEmpty()) {
+            throw new AppException(ErrorCode.MISSING_REQUEST_DATA);
+        }
+        if (fileName == null || !fileName.toLowerCase().endsWith(".pdf")
+                || !"application/pdf".equalsIgnoreCase(file.getContentType())) {
+            throw new AppException(ErrorCode.INVALID_FILE_FORMAT);
+        }
 
         Document doc = documentService.uploadDocument(
                 spaceId,
-                file.getOriginalFilename(),
+                fileName,
                 file.getBytes(),
                 file.getContentType()
         );

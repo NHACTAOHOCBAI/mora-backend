@@ -155,6 +155,8 @@ public class AiServiceClient {
                 return response.pages;
             }
             throw new AppException(ErrorCode.PDF_PROCESSING_FAILED);
+        } catch (AppException e) {
+            throw e;
         } catch (Exception e) {
             log.error("Failed to parse PDF through Python AI service", e);
             throw new AppException(ErrorCode.PDF_PROCESSING_FAILED);
@@ -184,7 +186,7 @@ public class AiServiceClient {
             log.error("Failed to validate key with Python AI service", e);
             PythonValidateKeyResponse res = new PythonValidateKeyResponse();
             res.valid = false;
-            res.message = "Không thể kết nối đến dịch vụ AI để kiểm tra: " + e.getMessage();
+            res.message = "Không thể kết nối đến dịch vụ AI để kiểm tra. Vui lòng thử lại sau.";
             return res;
         }
     }
@@ -213,6 +215,7 @@ public class AiServiceClient {
             log.info("Successfully requested Python AI service to index document ID: {}", documentId);
         } catch (Exception e) {
             log.error("Failed to request Python AI service to index document ID: {}", documentId, e);
+            throw new AppException(ErrorCode.AI_ENGINE_ERROR);
         }
     }
 }

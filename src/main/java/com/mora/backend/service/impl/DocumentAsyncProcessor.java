@@ -85,11 +85,7 @@ public class DocumentAsyncProcessor {
             doc = documentRepository.save(doc);
 
             // 3. Call Python AI Service to Index (indexing vector & keywords)
-            try {
-                aiServiceClient.indexDocument(doc.getId(), spaceId, doc.getName(), pages, apiKey);
-            } catch (Exception e) {
-                log.error("Failed to index document in AI Service, but continuing", e);
-            }
+            aiServiceClient.indexDocument(doc.getId(), spaceId, doc.getName(), pages, apiKey);
 
             // Update status to READY
             doc.setStatus(DocumentStatus.READY);
