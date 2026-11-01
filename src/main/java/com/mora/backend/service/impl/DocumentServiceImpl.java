@@ -9,7 +9,6 @@ import com.mora.backend.repository.SpaceMemberRepository;
 import com.mora.backend.repository.SpaceRepository;
 import com.mora.backend.service.DocumentService;
 import com.mora.backend.service.StorageService;
-import com.mora.backend.service.UserAiSettingService;
 import com.mora.backend.service.UserService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -31,7 +30,6 @@ public class DocumentServiceImpl implements DocumentService {
     private final StorageService storageService;
     private final DocumentAsyncProcessor documentAsyncProcessor;
     private final UserService userService;
-    private final UserAiSettingService userAiSettingService;
 
     @Override
     @Transactional
@@ -39,11 +37,6 @@ public class DocumentServiceImpl implements DocumentService {
         log.info("Creating upload placeholder document: name={}, size={}, contentType={}, spaceId={}", name, content.length, contentType, spaceId);
 
         User currentUser = userService.getCurrentUser();
-        UserAiSetting userSetting = userAiSettingService.getSettingForUser(currentUser);
-        if (userSetting.getGeminiApiKey() == null || userSetting.getGeminiApiKey().isBlank()) {
-            log.warn("User {} chưa cấu hình Gemini API Key khi tải tài liệu", currentUser.getUsername());
-            throw new AppException(ErrorCode.GEMINI_API_KEY_REQUIRED);
-        }
 
         Space space = spaceRepository.findById(spaceId)
                 .orElseThrow(() -> new AppException(ErrorCode.SPACE_NOT_FOUND));
@@ -77,10 +70,7 @@ public class DocumentServiceImpl implements DocumentService {
                             spaceId, 
                             content, 
                             name, 
-                            contentType,
-                            currentUser.getId(),
-                            userSetting.getGeminiApiKey(),
-                            userSetting.getParserModel()
+                            contentType
                     );
                 }
             }

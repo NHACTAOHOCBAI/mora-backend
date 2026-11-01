@@ -12,7 +12,7 @@ flowchart LR
   BE --> R2[Cloudflare R2\nTài liệu tải lên]
   BE -->|HTTP| AI[FastAPI AI Service\n:8000]
   AI --> Q[(Qdrant\n:6333 / :6334)]
-  AI --> Gemini[Google Gemini]
+  AI --> OpenAI[OpenAI]
 ```
 
 Khi người dùng tải tài liệu, Backend lưu metadata và tệp, sau đó xử lý bất đồng bộ: gọi AI Service để phân tích PDF, chunk/index nội dung vào Qdrant. Khi chat, Backend xác thực người dùng, chuyển yêu cầu phù hợp tới AI Service và phát các sự kiện space qua WebSocket.
@@ -36,15 +36,14 @@ src/main/java/com/mora/backend/
 └── exception/   # Lỗi nghiệp vụ và error handler
 ```
 
-Các nhóm API chính nằm dưới `/api`: `auth`, `users`, `documents`, `spaces`, `chat`, `admin` và `user/ai-settings`. Xem danh sách API theo code hiện hành tại Swagger: `http://localhost:8080/swagger-ui.html`.
 
 ## Điều phối chatbot
 
 Backend là lớp bảo mật, lưu vết và realtime của chatbot; Frontend không gọi AI Service trực tiếp.
 
-1. `POST /api/chat/space` xác thực JWT, lấy người dùng hiện tại, kiểm tra quyền thành viên của space (admin được phép) và yêu cầu người dùng đã cấu hình Gemini API key.
+1. `POST /api/chat/space` xác thực JWT và kiểm tra quyền truy cập space.
 2. Backend lấy các trang thuộc document được chọn, lịch sử do client gửi và bản tóm tắt hội thoại của space; sau đó lưu câu hỏi với loại `AI_QUERY` vào PostgreSQL.
-3. Câu hỏi được broadcast tới `/topic/spaces/{spaceId}/messages`, rồi `AiServiceClient` gọi `POST /api/chat` của AI Service với API key/model theo cài đặt người dùng.
+3. Câu hỏi được broadcast tới `/topic/spaces/{spaceId}/messages`, rồi `AiServiceClient` gọi `POST /api/chat` của AI Service với context, history và summary. AI Service tự quản lý OpenAI key/model.
 4. Khi nhận phản hồi, Backend lưu `AI_RESPONSE`, citation, câu hỏi đã cô đọng, prompt đã gửi và document đã chọn; phản hồi này lại được broadcast tới cùng topic.
 5. Sau mỗi 6 phản hồi assistant trong một space, Backend kích hoạt tác vụ tóm tắt hội thoại để cập nhật context dùng ở các lượt sau.
 
@@ -63,7 +62,7 @@ sequenceDiagram
   FE->>BE: POST /api/chat/space + JWT
   BE->>DB: Kiểm tra user, space, key và lưu AI_QUERY
   BE-->>WS: Broadcast câu hỏi
-  BE->>AI: POST /api/chat (context, history, model, key)
+  BE->>AI: POST /api/chat (context, history, summary)
   AI-->>BE: answer + citations + metadata
   BE->>DB: Lưu AI_RESPONSE và metadata
   BE-->>WS: Broadcast phản hồi AI
@@ -91,7 +90,6 @@ Các biến bắt buộc cho local:
 DB_URL=jdbc:postgresql://localhost:5433/mora_db
 DB_USERNAME=postgres
 DB_PASSWORD=postgres
-GEMINI_API_KEY=your_key
 ```
 
 Các biến tùy chọn gồm `PORT` (mặc định `8080`), `AI_SERVICE_URL` (mặc định `http://localhost:8000`) và cấu hình R2: `R2_ENDPOINT`, `R2_ACCESS_KEY`, `R2_SECRET_KEY`, `R2_BUCKET`, `R2_PUBLIC_URL`. Không commit `.env`.
@@ -134,3 +132,9 @@ docker run --env-file .env -p 8080:8080 mora-backend
 ```
 
 Container cần truy cập được database, Qdrant và AI Service theo các URL đã cấu hình.
+
+## Lập lại chỉ mục OpenAI
+
+Đặt `AI_REINDEX_ON_STARTUP=true` để chạy tác vụ backend đọc lại `document_pages` và index qua AI Service. Tác vụ báo kết quả từng tài liệu và tổng thành công/thất bại; có lỗi sẽ không hoàn tất startup. Sau khi thành công, đặt biến này về `false` và bật retrieval tại AI Service. Xem [quy trình chuyển đổi](../mora-ai/README.md#chuyển-chỉ-mục-sang-openai).
+
+Backend không lưu hoặc truyền key/model AI của người dùng. Không còn API `/api/user/ai-settings` và kiểm tra key. Các bảng cũ được giữ nhưng ngừng sử dụng; schema mới không tạo chúng.

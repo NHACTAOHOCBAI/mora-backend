@@ -12,7 +12,6 @@ import com.mora.backend.model.dto.response.SpaceChatResponse;
 import com.mora.backend.model.entity.*;
 import com.mora.backend.repository.*;
 import com.mora.backend.service.ChatService;
-import com.mora.backend.service.UserAiSettingService;
 import com.mora.backend.service.UserService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -37,7 +36,6 @@ public class ChatServiceImpl implements ChatService {
     private final AiServiceClient aiServiceClient;
     private final ChatSummaryHelper chatSummaryHelper;
     private final UserService userService;
-    private final UserAiSettingService userAiSettingService;
     private final SimpMessagingTemplate messagingTemplate;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -81,11 +79,6 @@ public class ChatServiceImpl implements ChatService {
     @Transactional
     public SpaceChatResponse chatWithSpace(SpaceChatRequest request) {
         User currentUser = userService.getCurrentUser();
-        UserAiSetting userSetting = userAiSettingService.getSettingForUser(currentUser);
-        if (userSetting.getGeminiApiKey() == null || userSetting.getGeminiApiKey().isBlank()) {
-            log.warn("User {} chưa cấu hình Gemini API Key", currentUser.getUsername());
-            throw new AppException(ErrorCode.GEMINI_API_KEY_REQUIRED);
-        }
 
         Space space = spaceRepository.findById(request.getSpaceId())
                 .orElseThrow(() -> {
@@ -102,9 +95,14 @@ public class ChatServiceImpl implements ChatService {
         List<Document> documents;
         if (request.getDocumentIds() != null && !request.getDocumentIds().isEmpty()) {
             documents = documentRepository.findAllById(request.getDocumentIds());
+            if (documents.size() != request.getDocumentIds().stream().distinct().count()
+                    || documents.stream().anyMatch(doc -> !doc.getSpace().getId().equals(space.getId()))) {
+                throw new AppException(ErrorCode.SPACE_ACCESS_DENIED);
+            }
         } else {
             documents = documentRepository.findBySpaceId(request.getSpaceId());
         }
+        documents = documents.stream().filter(doc -> doc.getStatus() == DocumentStatus.READY).toList();
 
         List<AiServiceClient.PythonChatRequest.ContextItem> contextItems = new ArrayList<>();
         for (Document doc : documents) {
@@ -164,19 +162,14 @@ public class ChatServiceImpl implements ChatService {
         AiServiceClient.PythonChatRequest pythonRequest = new AiServiceClient.PythonChatRequest();
         pythonRequest.question = request.getQuestion();
         pythonRequest.spaceId = space.getId();
-        pythonRequest.documentIds = request.getDocumentIds();
+        // Always constrain retrieval to existing, ready documents in this space.
+        pythonRequest.documentIds = documents.stream().map(Document::getId).toList();
         pythonRequest.context = contextItems;
         pythonRequest.history = historyItems;
         pythonRequest.chatSummary = space.getChatSummary();
-        pythonRequest.apiKey = userSetting.getGeminiApiKey();
-        pythonRequest.chatModel = userSetting.getChatModel();
-        pythonRequest.routerModel = userSetting.getRouterModel();
-        pythonRequest.evaluatorModel = userSetting.getEvaluatorModel();
 
         AiServiceClient.PythonChatResponse pythonResponse = aiServiceClient.callChat(pythonRequest);
 
-        userAiSettingService.recordUsage(currentUser.getId(), userSetting.getChatModel());
-        userAiSettingService.recordUsage(currentUser.getId(), userSetting.getRouterModel());
 
         // Lưu phản hồi của Assistant
         String citationsJson = "";
@@ -225,9 +218,6 @@ public class ChatServiceImpl implements ChatService {
 
                 chatSummaryHelper.updateSpaceChatSummary(
                         space.getId(), 
-                        currentUser.getId(),
-                        userSetting.getGeminiApiKey(), 
-                        userSetting.getSummarizerModel(), 
                         fullHistoryForSummary
                 );
             }

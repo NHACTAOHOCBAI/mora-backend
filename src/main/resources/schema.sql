@@ -74,22 +74,3 @@ CREATE TABLE IF NOT EXISTS chat_messages (
     citations TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
-
-CREATE TABLE IF NOT EXISTS user_ai_settings (
-    id BIGSERIAL PRIMARY KEY,
-    user_id BIGINT NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
-    gemini_api_key VARCHAR(255),
-    selected_model VARCHAR(100),
-    parser_model VARCHAR(100),
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE TABLE IF NOT EXISTS user_ai_daily_usages (
-    id BIGSERIAL PRIMARY KEY,
-    user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    usage_date DATE NOT NULL,
-    request_count INT DEFAULT 0,
-    token_count INT DEFAULT 0,
-    UNIQUE(user_id, usage_date)
-);
