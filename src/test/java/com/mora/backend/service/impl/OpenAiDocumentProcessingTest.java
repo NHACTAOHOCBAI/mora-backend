@@ -32,7 +32,7 @@ class OpenAiDocumentProcessingTest {
     }
 
     private DocumentAsyncProcessor processor() {
-        return new DocumentAsyncProcessor(documents, pages, storage, ai);
+        return new DocumentAsyncProcessor(documents, pages, storage, ai, mock(com.mora.backend.benchmark.BenchmarkAiClient.class));
     }
 
     private void setupUpload() {
