@@ -243,9 +243,12 @@ public class BenchmarkService implements DisposableBean {
                 var trace=parse(s.getTraceJson()); var body=json.createObjectNode(); body.put("question",q.path("question").asText());
                 body.set("referenceAnswer",q.path("referenceAnswer")); body.set("trace",trace); body.set("config",config);
                 var metrics=(ObjectNode)ai.call("score",body);
-                metrics.set("citationAccuracy",json.createObjectNode().put("value",BenchmarkMath.citationAccuracy(trace.path("response").path("citations"),q.path("sources"),snap.path("documents"))).put("status","ok"));
+                metrics.set("citationAccuracy",json.valueToTree(BenchmarkMath.citationMetric(
+                        trace.path("response").path("citations"),q.path("sources"),snap.path("documents"))));
                 metrics.set("latency",json.createObjectNode().set("value",trace.path("pipeline").path("timings").path("totalMs")));
                 ((ObjectNode)metrics.get("latency")).put("status","ok");
+                ((ObjectNode)metrics.get("latency")).set("details",json.valueToTree(
+                        BenchmarkMath.latencyDetails(trace.path("pipeline").path("timings"))));
                 boolean errors=false; for (var m : metrics) if ("error".equals(m.path("status").asText())) errors=true;
                 s.setMetricsJson(metrics.toString()); s.setStatus(errors?"JUDGE_ERROR":"COMPLETED");
                 if (errors) s.setError("Some judge metrics failed");
@@ -297,7 +300,8 @@ public class BenchmarkService implements DisposableBean {
             }
             Map<String,Object> m=new LinkedHashMap<>(); m.put("valid",values.size()); m.put("errors",errors); m.put("missing",missing); m.put("notApplicable",na);
             m.put("mean",values.isEmpty()?null:values.stream().mapToDouble(Double::doubleValue).average().orElseThrow());
-            if (name.equals("latency")) { m.put("median",values.isEmpty()?null:BenchmarkMath.percentile(values,.5)); m.put("p95",values.isEmpty()?null:BenchmarkMath.percentile(values,.95)); }
+            m.put("median",values.isEmpty()?null:BenchmarkMath.percentile(values,.5));
+            m.put("p95",values.isEmpty()?null:BenchmarkMath.percentile(values,.95));
             result.put(name,m);
         }
         return result;

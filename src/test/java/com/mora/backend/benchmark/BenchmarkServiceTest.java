@@ -92,6 +92,10 @@ class BenchmarkServiceTest {
         verify(ai,times(1)).call(eq("execute"),any());
         assertEquals("COMPLETED",stored.get(0).getStatus());
         assertTrue(service.csv(1).contains("123"));
+        var metrics=json.readTree(stored.get(0).getMetricsJson());
+        assertEquals(1,metrics.path("citationAccuracy").path("details").path("version").asInt());
+        assertEquals(0,metrics.path("citationAccuracy").path("details").path("predictedCount").asInt());
+        assertEquals(123.,metrics.path("latency").path("details").path("totalMs").asDouble());
     }
     @Test void recoveryMarksActiveRunsInterrupted() {
         var r=new BenchmarkRun(); r.setStatus("RUNNING");
@@ -104,5 +108,43 @@ class BenchmarkServiceTest {
         assertEquals(1,result.path("ALL").path("faithfulness").path("notApplicable").asInt());
         assertEquals(1,result.path("ALL").path("answerRelevance").path("errors").asInt());
         assertTrue(result.path("ALL").path("faithfulness").path("mean").isNull());
+    }
+    @Test void allMetricsIncludeMedianAndP95FromValidScoresOnly() {
+        var names=List.of("contextPrecision","faithfulness","answerRelevance","citationAccuracy","latency");
+        List<BenchmarkSample> rows=new ArrayList<>();
+        for(double value:List.of(.2,.4,.6,1.)) {
+            var s=new BenchmarkSample();s.setQuestionType("DIRECT");s.setStatus("COMPLETED");
+            var metrics=json.createObjectNode();
+            for(String name:names) metrics.putObject(name).put("value",value).put("status","ok");
+            s.setMetricsJson(metrics.toString());rows.add(s);
+        }
+        for(String status:List.of("error","not_applicable")) {
+            var s=new BenchmarkSample();s.setQuestionType("DIRECT");s.setStatus("JUDGE_ERROR");
+            var metrics=json.createObjectNode();
+            for(String name:names) metrics.putObject(name).put("value",999).put("status",status);
+            s.setMetricsJson(metrics.toString());rows.add(s);
+        }
+        var result=json.valueToTree(service.summary(rows));
+        for(String group:List.of("ALL","DIRECT")) for(String name:names) {
+            var metric=result.path(group).path(name);
+            assertEquals(4,metric.path("valid").asInt());
+            assertEquals(.55,metric.path("mean").asDouble(),1e-9);
+            assertEquals(.5,metric.path("median").asDouble(),1e-9);
+            assertEquals(.94,metric.path("p95").asDouble(),1e-9);
+            assertEquals(1,metric.path("errors").asInt());
+            assertEquals(1,metric.path("notApplicable").asInt());
+        }
+        for(String name:names) {
+            assertTrue(result.path("VISUAL").path(name).path("median").isNull());
+            assertTrue(result.path("VISUAL").path(name).path("p95").isNull());
+        }
+    }
+    @Test void singleValidScoreHasIdenticalMeanMedianAndP95() {
+        var sample=new BenchmarkSample();sample.setQuestionType("VISUAL");sample.setStatus("COMPLETED");
+        sample.setMetricsJson("{\"faithfulness\":{\"value\":0.8,\"status\":\"ok\"}}");
+        var metric=json.valueToTree(service.summary(List.of(sample))).path("ALL").path("faithfulness");
+        assertEquals(.8,metric.path("mean").asDouble());
+        assertEquals(.8,metric.path("median").asDouble());
+        assertEquals(.8,metric.path("p95").asDouble());
     }
 }
