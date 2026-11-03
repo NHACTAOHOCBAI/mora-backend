@@ -35,11 +35,18 @@ CREATE TABLE IF NOT EXISTS space_invitations (
     id BIGSERIAL PRIMARY KEY,
     space_id BIGINT NOT NULL REFERENCES spaces(id) ON DELETE CASCADE,
     inviter_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    invitee_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    invite_code VARCHAR(64) NOT NULL UNIQUE,
+    invite_email VARCHAR(100),
+    role VARCHAR(20) NOT NULL DEFAULT 'EDITOR',
     status VARCHAR(20) NOT NULL DEFAULT 'PENDING',
+    expires_at TIMESTAMP,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+-- Compatibility migration: earlier local schemas required an invitee for every
+-- invitation. Shareable invitation links intentionally do not have one.
+ALTER TABLE space_invitations ALTER COLUMN invitee_id DROP NOT NULL;
 
 CREATE TABLE IF NOT EXISTS documents (
     id BIGSERIAL PRIMARY KEY,
