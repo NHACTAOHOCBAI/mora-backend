@@ -51,6 +51,7 @@ public class SecurityConfig {
                                 "/api/chat/stream/**",
                                 "/ws/**",
                                 "/api/hello",
+                                "/actuator/health/liveness",
                                 "/error"
                         ).permitAll()
                         .requestMatchers("/api/admin/**").hasAuthority("ROLE_ADMIN")

@@ -133,6 +133,25 @@ docker run --env-file .env -p 8080:8080 mora-backend
 
 Container cần truy cập được database, Qdrant và AI Service theo các URL đã cấu hình.
 
+## Health check, cấu hình triển khai và Docker Compose
+
+`GET /actuator/health/liveness` là liveness endpoint công khai cho Docker/ECS;
+nó không gọi database, AI hay Qdrant. Các biến `JWT_SECRET` (tối thiểu 32 byte)
+và `JWT_EXPIRATION_MS` là bắt buộc. CORS REST/WebSocket dùng
+`CORS_ALLOWED_ORIGINS` (danh sách origin, phân tách bằng dấu phẩy).
+
+Backend không còn tự tạo admin. Chỉ bật seed ở local khi đặt
+`MORA_ADMIN_SEED_ENABLED=true` cùng đủ bốn biến `MORA_ADMIN_*`.
+
+Để chạy toàn bộ Mora bằng Docker Compose, dùng repository
+[`../mora-infra`](../mora-infra/README.md):
+
+```bash
+cd ../mora-infra
+cp .env.example .env
+docker compose --env-file .env up --build
+```
+
 ## Lập lại chỉ mục OpenAI
 
 Đặt `AI_REINDEX_ON_STARTUP=true` để chạy tác vụ backend đọc lại `document_pages` và index qua AI Service. Tác vụ báo kết quả từng tài liệu và tổng thành công/thất bại; có lỗi sẽ không hoàn tất startup. Sau khi thành công, đặt biến này về `false` và bật retrieval tại AI Service. Xem [quy trình chuyển đổi](../mora-ai/README.md#chuyển-chỉ-mục-sang-openai).

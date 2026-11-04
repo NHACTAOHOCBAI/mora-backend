@@ -6,11 +6,13 @@ import com.mora.backend.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 
 @Component
+@ConditionalOnProperty(name = "mora.admin.seed-enabled", havingValue = "true")
 @RequiredArgsConstructor
 @Slf4j
 public class DatabaseSeeder implements CommandLineRunner {
@@ -18,16 +20,16 @@ public class DatabaseSeeder implements CommandLineRunner {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
 
-    @Value("${mora.admin.username:admin}")
+    @Value("${mora.admin.username}")
     private String adminUsername;
 
-    @Value("${mora.admin.password:admin123}")
+    @Value("${mora.admin.password}")
     private String adminPassword;
 
-    @Value("${mora.admin.email:admin@mora.com}")
+    @Value("${mora.admin.email}")
     private String adminEmail;
 
-    @Value("${mora.admin.fullName:Mora System Admin}")
+    @Value("${mora.admin.full-name}")
     private String adminFullName;
 
     @Override
