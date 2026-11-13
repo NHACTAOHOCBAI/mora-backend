@@ -25,6 +25,7 @@ public class DocumentServiceImpl implements DocumentService {
 
     private final DocumentRepository documentRepository;
     private final DocumentPageRepository documentPageRepository;
+    private final com.mora.backend.repository.StudySetDocumentRepository studySetDocumentRepository;
     private final SpaceRepository spaceRepository;
     private final SpaceMemberRepository spaceMemberRepository;
     private final StorageService storageService;
@@ -117,7 +118,8 @@ public class DocumentServiceImpl implements DocumentService {
             storageService.deleteFile(fileKey);
         }
 
-        // 2. Delete document pages and document from DB
+        // 2. Detach it from shared study sets, then delete pages and document.
+        studySetDocumentRepository.deleteByDocumentId(documentId);
         documentPageRepository.deleteByDocumentId(documentId);
         documentRepository.delete(doc);
         log.info("Deleted document and pages for ID: {}", documentId);

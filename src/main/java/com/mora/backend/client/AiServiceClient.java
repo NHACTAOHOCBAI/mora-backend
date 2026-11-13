@@ -171,4 +171,29 @@ public class AiServiceClient {
             throw new AppException(ErrorCode.AI_ENGINE_ERROR);
         }
     }
+
+    public static class PythonStudyGenerateRequest {
+        public Long spaceId;
+        public List<Long> documentIds;
+        public Integer cardCount;
+        public List<StudyContextItem> context;
+        public static class StudyContextItem { public Long documentId; public String documentName; public Integer pageNumber; public String text; }
+    }
+    public static class PythonStudyGenerateResponse {
+        public String title;
+        public List<StudyFlashcard> flashcards;
+        public List<StudyQuizQuestion> quizQuestions;
+        public static class StudyCitation { public Long documentId; public String documentName; public Integer pageNumber; public String quote; }
+        public static class StudyFlashcard { public String front; public String back; public StudyCitation citation; }
+        public static class StudyQuizQuestion { public String question; public List<String> options; public Integer correctOptionIndex; public String explanation; public StudyCitation citation; }
+    }
+
+    public PythonStudyGenerateResponse generateStudySet(PythonStudyGenerateRequest request) {
+        try {
+            return restTemplate.postForObject(aiServiceUrl + "/api/study/generate", request, PythonStudyGenerateResponse.class);
+        } catch (Exception e) {
+            log.error("Failed to generate study set through Python AI service", e);
+            throw new AppException(ErrorCode.AI_ENGINE_ERROR);
+        }
+    }
 }

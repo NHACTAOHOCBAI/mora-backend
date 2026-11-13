@@ -81,3 +81,32 @@ CREATE TABLE IF NOT EXISTS chat_messages (
     citations TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE TABLE IF NOT EXISTS study_sets (
+    id BIGSERIAL PRIMARY KEY,
+    title VARCHAR(255) NOT NULL,
+    space_id BIGINT NOT NULL REFERENCES spaces(id) ON DELETE CASCADE,
+    created_by_id BIGINT REFERENCES users(id) ON DELETE SET NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS study_set_documents (
+    id BIGSERIAL PRIMARY KEY,
+    study_set_id BIGINT NOT NULL REFERENCES study_sets(id) ON DELETE CASCADE,
+    document_id BIGINT NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
+    UNIQUE(study_set_id, document_id)
+);
+
+CREATE TABLE IF NOT EXISTS flashcards (
+    id BIGSERIAL PRIMARY KEY,
+    study_set_id BIGINT NOT NULL REFERENCES study_sets(id) ON DELETE CASCADE,
+    front TEXT NOT NULL, back TEXT NOT NULL,
+    document_id BIGINT, document_name VARCHAR(255), page_number INT, source_quote TEXT
+);
+
+CREATE TABLE IF NOT EXISTS quiz_questions (
+    id BIGSERIAL PRIMARY KEY,
+    study_set_id BIGINT NOT NULL REFERENCES study_sets(id) ON DELETE CASCADE,
+    question TEXT NOT NULL, options_json TEXT NOT NULL, correct_option_index INT NOT NULL,
+    explanation TEXT NOT NULL, document_id BIGINT, document_name VARCHAR(255), page_number INT, source_quote TEXT
+);
