@@ -11,6 +11,10 @@ import java.util.List;
 
 @Repository
 public interface SpaceRepository extends JpaRepository<Space, Long> {
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT s FROM Space s WHERE s.id = :id")
+    java.util.Optional<Space> findForUpdate(@Param("id") Long id);
+
     List<Space> findByUser(User user);
 
     @Query("SELECT DISTINCT s FROM Space s LEFT JOIN SpaceMember sm ON sm.space = s WHERE s.user = :user OR sm.user = :user ORDER BY s.updatedAt DESC")

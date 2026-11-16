@@ -5,6 +5,7 @@ import lombok.Getter;
 
 @Getter
 public enum ErrorCode {
+    MESSAGE_NOT_FOUND(1035, "Không tìm thấy tin nhắn trong không gian này", HttpStatus.NOT_FOUND),
     UNCATEGORIZED_EXCEPTION(9999, "Lỗi không xác định", HttpStatus.INTERNAL_SERVER_ERROR),
     INVALID_KEY(1001, "Dữ liệu yêu cầu không hợp lệ", HttpStatus.BAD_REQUEST),
     USER_EXISTED(1002, "Người dùng đã tồn tại", HttpStatus.BAD_REQUEST),

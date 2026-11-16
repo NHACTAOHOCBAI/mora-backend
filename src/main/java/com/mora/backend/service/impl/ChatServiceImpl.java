@@ -1,6 +1,5 @@
 package com.mora.backend.service.impl;
 
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mora.backend.client.AiServiceClient;
 import com.mora.backend.exception.AppException;
@@ -37,6 +36,7 @@ public class ChatServiceImpl implements ChatService {
     private final ChatSummaryHelper chatSummaryHelper;
     private final UserService userService;
     private final SimpMessagingTemplate messagingTemplate;
+    private final com.mora.backend.service.ChatStateNotifier chatStateNotifier;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     private static final int SUMMARY_BATCH_INTERVAL = 6;
@@ -266,7 +266,7 @@ public class ChatServiceImpl implements ChatService {
     @Transactional
     public void clearSpaceChatHistory(Long spaceId) {
         User currentUser = userService.getCurrentUser();
-        Space space = spaceRepository.findById(spaceId)
+        Space space = spaceRepository.findForUpdate(spaceId)
                 .orElseThrow(() -> new AppException(ErrorCode.SPACE_NOT_FOUND));
 
         SpaceRole userRole = getUserRole(space, currentUser);
@@ -277,57 +277,11 @@ public class ChatServiceImpl implements ChatService {
         chatMessageRepository.deleteBySpaceId(spaceId);
         space.setChatSummary(null);
         spaceRepository.save(space);
+        chatStateNotifier.changed(spaceId, true);
     }
 
     private ChatMessageResponse mapToResponse(ChatMessage msg) {
-        List<SpaceChatResponse.SpaceCitation> responseCitations = new ArrayList<>();
-        if (msg.getCitations() != null && !msg.getCitations().isBlank()) {
-            try {
-                List<AiServiceClient.PythonChatResponse.Citation> citations = objectMapper.readValue(
-                        msg.getCitations(),
-                        new TypeReference<List<AiServiceClient.PythonChatResponse.Citation>>() {}
-                );
-                responseCitations = citations.stream()
-                        .map(c -> SpaceChatResponse.SpaceCitation.builder()
-                                .quote(c.quote)
-                                .documentId(c.documentId)
-                                .documentName(c.documentName)
-                                .pageNumber(c.pageNumber)
-                                .build())
-                        .toList();
-            } catch (Exception e) {
-                log.error("Failed to deserialize citations for message ID: {}", msg.getId(), e);
-            }
-        }
-
-        List<Long> selectedDocIds = new ArrayList<>();
-        if (msg.getSelectedDocumentIds() != null && !msg.getSelectedDocumentIds().isBlank()) {
-            try {
-                selectedDocIds = objectMapper.readValue(msg.getSelectedDocumentIds(), new TypeReference<List<Long>>() {});
-            } catch (Exception e) {
-                log.warn("Failed to deserialize selectedDocumentIds for message ID: {}", msg.getId());
-            }
-        }
-
-        User u = msg.getUser();
-        String userName = u != null ? (u.getFullName() != null ? u.getFullName() : u.getUsername()) : null;
-        String userAvatar = u != null ? u.getAvatarUrl() : null;
-        Long userId = u != null ? u.getId() : null;
-
-        return ChatMessageResponse.builder()
-                .id(msg.getId())
-                .sender(msg.getSender())
-                .messageType(msg.getMessageType())
-                .text(msg.getText())
-                .userId(userId)
-                .userName(userName)
-                .userAvatar(userAvatar)
-                .timestamp(msg.getCreatedAt())
-                .condensedQuestion(msg.getCondensedQuestion())
-                .promptSent(msg.getPromptSent())
-                .citations(responseCitations)
-                .selectedDocumentIds(selectedDocIds)
-                .build();
+        return com.mora.backend.util.ChatMessageMapper.toResponse(msg, objectMapper);
     }
 
     private SpaceRole getUserRole(Space space, User user) {

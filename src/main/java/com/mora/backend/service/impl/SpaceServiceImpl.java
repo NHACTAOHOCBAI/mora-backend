@@ -138,7 +138,7 @@ public class SpaceServiceImpl implements SpaceService {
     @Transactional
     public void deleteSpace(Long id) {
         User currentUser = userService.getCurrentUser();
-        Space space = spaceRepository.findById(id)
+        Space space = spaceRepository.findForUpdate(id)
                 .orElseThrow(() -> {
                     log.warn("Space with ID {} not found for deletion", id);
                     return new AppException(ErrorCode.SPACE_NOT_FOUND);
