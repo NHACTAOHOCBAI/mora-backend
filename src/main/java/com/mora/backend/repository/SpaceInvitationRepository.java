@@ -13,6 +13,9 @@ public interface SpaceInvitationRepository extends JpaRepository<SpaceInvitation
 
     Optional<SpaceInvitation> findByInviteCode(String inviteCode);
 
+    @org.springframework.data.jpa.repository.Query("SELECT i.space.id FROM SpaceInvitation i WHERE i.inviteCode = :code")
+    Optional<Long> findSpaceIdByInviteCode(@org.springframework.data.repository.query.Param("code") String code);
+
     List<SpaceInvitation> findBySpaceId(Long spaceId);
 
     List<SpaceInvitation> findBySpaceIdAndStatus(Long spaceId, InvitationStatus status);

@@ -20,4 +20,9 @@ public class SpaceJoinPreviewResponse {
     private int memberCount;
     private int documentCount;
     private boolean isAlreadyMember;
+
+    @com.fasterxml.jackson.annotation.JsonProperty("isAlreadyMember")
+    public boolean isAlreadyMember() {
+        return isAlreadyMember;
+    }
 }

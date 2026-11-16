@@ -335,6 +335,8 @@ public class SpaceServiceImpl implements SpaceService {
     @Transactional
     public void revokeInvitation(Long spaceId, Long invitationId) {
         User currentUser = userService.getCurrentUser();
+        spaceRepository.findForUpdate(spaceId)
+                .orElseThrow(() -> new AppException(ErrorCode.SPACE_NOT_FOUND));
         SpaceRole callerRole = getUserRoleInSpace(spaceId, currentUser);
         if (currentUser.getRole() != Role.ROLE_ADMIN && callerRole != SpaceRole.OWNER) {
             throw new AppException(ErrorCode.SPACE_ACCESS_DENIED);
@@ -343,6 +345,9 @@ public class SpaceServiceImpl implements SpaceService {
         SpaceInvitation invitation = spaceInvitationRepository.findById(invitationId)
                 .orElseThrow(() -> new AppException(ErrorCode.INVITATION_NOT_FOUND));
 
+        if (!invitation.getSpace().getId().equals(spaceId)) {
+            throw new AppException(ErrorCode.INVITATION_NOT_FOUND);
+        }
         invitation.setStatus(InvitationStatus.REVOKED);
         spaceInvitationRepository.save(invitation);
         log.info("Revoked invitation {} for space {}", invitationId, spaceId);
@@ -359,14 +364,15 @@ public class SpaceServiceImpl implements SpaceService {
             throw new AppException(ErrorCode.INVITATION_NOT_FOUND);
         }
 
-        if (invitation.getExpiresAt() != null && invitation.getExpiresAt().isBefore(LocalDateTime.now())) {
+        if (invitation.getExpiresAt() != null && !invitation.getExpiresAt().isAfter(LocalDateTime.now())) {
             throw new AppException(ErrorCode.INVITATION_EXPIRED);
         }
 
         Space space = invitation.getSpace();
         int memberCount = spaceMemberRepository.findBySpaceId(space.getId()).size();
         int docCount = documentRepository.findBySpaceId(space.getId()).size();
-        boolean isAlreadyMember = spaceMemberRepository.existsBySpaceIdAndUserId(space.getId(), currentUser.getId());
+        boolean isAlreadyMember = (space.getUser() != null && space.getUser().getId().equals(currentUser.getId()))
+                || spaceMemberRepository.existsBySpaceIdAndUserId(space.getId(), currentUser.getId());
 
         String inviterName = invitation.getInviter() != null
                 ? (invitation.getInviter().displayName())
@@ -389,18 +395,28 @@ public class SpaceServiceImpl implements SpaceService {
     @Transactional
     public SpaceResponse joinSpaceByInviteCode(String inviteCode) {
         User currentUser = userService.getCurrentUser();
-        SpaceInvitation invitation = spaceInvitationRepository.findByInviteCode(inviteCode.trim().toUpperCase())
+        String code = inviteCode.trim().toUpperCase(java.util.Locale.ROOT);
+        Long spaceId = spaceInvitationRepository.findSpaceIdByInviteCode(code)
+                .orElseThrow(() -> new AppException(ErrorCode.INVITATION_NOT_FOUND));
+        Space space = spaceRepository.findForUpdate(spaceId)
+                .orElseThrow(() -> new AppException(ErrorCode.SPACE_NOT_FOUND));
+        // Read the invitation only after acquiring the workspace lock, so a concurrent
+        // revoke or join cannot leave a stale invitation or create duplicate membership.
+        SpaceInvitation invitation = spaceInvitationRepository.findByInviteCode(code)
                 .orElseThrow(() -> new AppException(ErrorCode.INVITATION_NOT_FOUND));
 
         if (invitation.getStatus() != InvitationStatus.PENDING) {
             throw new AppException(ErrorCode.INVITATION_NOT_FOUND);
         }
 
-        if (invitation.getExpiresAt() != null && invitation.getExpiresAt().isBefore(LocalDateTime.now())) {
+        if (invitation.getExpiresAt() != null && !invitation.getExpiresAt().isAfter(LocalDateTime.now())) {
             throw new AppException(ErrorCode.INVITATION_EXPIRED);
         }
 
-        Space space = invitation.getSpace();
+        if (space.getUser() != null && space.getUser().getId().equals(currentUser.getId())) {
+            return convertToSpaceResponse(space, SpaceRole.OWNER,
+                    spaceMemberRepository.findBySpaceId(spaceId).size(), documentRepository.findBySpaceId(spaceId).size());
+        }
 
         // Check if already a member
         Optional<SpaceMember> existingMemberOpt = spaceMemberRepository.findBySpaceIdAndUserId(space.getId(), currentUser.getId());
@@ -420,7 +436,7 @@ public class SpaceServiceImpl implements SpaceService {
         int memberCount = spaceMemberRepository.findBySpaceId(space.getId()).size();
         int docCount = documentRepository.findBySpaceId(space.getId()).size();
 
-        log.info("User {} joined space {} via code {} as {}", currentUser.getEmail(), space.getId(), inviteCode, invitation.getRole());
+        log.info("User {} joined space {} as {}", currentUser.getId(), space.getId(), invitation.getRole());
         return convertToSpaceResponse(space, invitation.getRole(), memberCount, docCount);
     }
 
