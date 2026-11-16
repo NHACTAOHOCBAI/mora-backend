@@ -112,3 +112,6 @@ CREATE TABLE IF NOT EXISTS quiz_questions (
 
 -- Remove obsolete account handle on existing installations (no cascading deletes).
 ALTER TABLE users DROP COLUMN IF EXISTS username;
+
+-- Preserve existing sessions until an account actually resets its password.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS credential_version BIGINT NOT NULL DEFAULT 0;

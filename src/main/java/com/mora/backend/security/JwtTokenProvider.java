@@ -61,6 +61,7 @@ public class JwtTokenProvider {
         return Jwts.builder()
                 .claims(extraClaims)
                 .claim("tokenVersion", 2)
+                .claim("credentialVersion", userDetails instanceof AccountPrincipal account ? account.getCredentialVersion() : 0)
                 .subject(userDetails.getUsername())
                 .issuedAt(new Date(System.currentTimeMillis()))
                 .expiration(new Date(System.currentTimeMillis() + jwtExpiration))
@@ -70,7 +71,11 @@ public class JwtTokenProvider {
 
     public boolean isTokenValid(String token, UserDetails userDetails) {
         final String userId = extractUserId(token);
-        return (userId.equals(userDetails.getUsername())) && !isTokenExpired(token);
+        Number claim = extractClaim(token, claims -> claims.get("credentialVersion", Number.class));
+        long tokenVersion = claim == null ? 0 : claim.longValue();
+        long currentVersion = userDetails instanceof AccountPrincipal account ? account.getCredentialVersion() : 0;
+        return userDetails.isEnabled() && userId.equals(userDetails.getUsername())
+                && tokenVersion == currentVersion && !isTokenExpired(token);
     }
 
     private boolean isTokenExpired(String token) {

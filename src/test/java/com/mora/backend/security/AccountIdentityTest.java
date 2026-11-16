@@ -59,6 +59,17 @@ class AccountIdentityTest {
     }
 
     @Test
+    void acceptsExistingVersionTwoTokensUntilPasswordRecoveryChangesCredentials() {
+        var key = Keys.hmacShaKeyFor(SECRET.getBytes(StandardCharsets.UTF_8));
+        var existing = Jwts.builder().subject("42").claim("tokenVersion", 2)
+                .expiration(new Date(System.currentTimeMillis() + 60000)).signWith(key).compact();
+        var account = account();
+        assertTrue(provider().isTokenValid(existing, new AccountPrincipal(account)));
+        account.setCredentialVersion(1);
+        assertFalse(provider().isTokenValid(existing, new AccountPrincipal(account)));
+    }
+
+    @Test
     void disabledAccountsCannotLoginOrReconnect() {
         var repository = mock(UserRepository.class);
         var account = account();

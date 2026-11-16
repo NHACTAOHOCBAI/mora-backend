@@ -177,3 +177,53 @@ initialization currently continues on errors, verify the column was removed; if
 an external dependency blocks removal, resolve it explicitly before reopening
 traffic. Rolling back requires the backup, since discarded handles cannot be
 reconstructed. Do not run the application context test against a production DB.
+
+## Khôi phục mật khẩu qua SMTP
+
+Frontend có /forgot-password và /reset-password?token=..., truy cập được cả
+khi đã đăng nhập. Backend cung cấp POST /api/auth/forgot-password (email) và
+POST /api/auth/reset-password (token, newPassword).
+
+Cấu hình môi trường backend (xem [.env.example](.env.example)):
+
+    PASSWORD_RECOVERY_ENABLED=true
+    PASSWORD_RECOVERY_FRONTEND_URL=https://mora.example.com
+    MAIL_FROM=Mora <no-reply@example.com>
+    MAIL_HOST=smtp.example.com
+    MAIL_PORT=587
+    MAIL_USERNAME=your-smtp-user
+    MAIL_PASSWORD=your-smtp-password
+    MAIL_SMTP_AUTH=true
+    MAIL_STARTTLS=true
+    MAIL_STARTTLS_REQUIRED=true
+
+Dùng mật khẩu ứng dụng nếu nhà cung cấp yêu cầu. Không commit thông tin SMTP.
+URL frontend là cấu hình tin cậy, không lấy từ Host header của yêu cầu.
+Dùng HTTPS trong môi trường production.
+
+Tính năng mặc định tắt: API yêu cầu khôi phục trả 503 thống nhất khi chưa bật.
+Sau cấu hình, khởi động lại backend. Hãy gửi thử tới hộp thư do bạn kiểm soát,
+kiểm tra cả thư rác và hoàn thành luồng trước khi mở cho người dùng.
+
+Yêu cầu gửi email trả cùng thông báo cho email không tồn tại, tài khoản bị khóa
+và email hợp lệ. Email gửi bất đồng bộ sau khi commit, có cả văn bản và HTML.
+SMTP lỗi hoặc hàng đợi đầy chỉ được ghi log tổng quát, không tiết lộ tài khoản
+qua API; theo dõi log “Password recovery email delivery failed” và
+“Password recovery email queue is full”. Không log token hoặc nội dung email.
+
+Liên kết có hiệu lực 30 phút, dùng một lần; mật khẩu tối thiểu 6 ký tự, tối đa
+72 byte UTF-8. Server giới hạn 1 yêu cầu/email/phút, 5 yêu cầu/IP/15 phút và
+20 lần đặt lại/IP/15 phút. Bộ giới hạn nằm trong bộ nhớ, giới hạn 10.000 bucket;
+khởi động lại sẽ xóa hạn mức. Khi chạy nhiều instance cần rate limit dùng chung
+ở proxy hoặc kho dữ liệu chung. IP dùng getRemoteAddr, không tin trực tiếp
+header X-Forwarded-For; cấu hình proxy tin cậy của server nếu có reverse proxy.
+
+Hibernate tạo bảng password_reset_tokens; cột users.credential_version có
+mặc định 0, giữ tương thích JWT đang dùng. Token cũ thiếu claim này được hiểu là
+0. Sau khôi phục, JWT cũ bị từ chối ở HTTP và lần kết nối WebSocket tiếp theo;
+WebSocket đang mở không bị đóng chủ động trong phiên bản này. Các liên kết khôi
+phục khác của tài khoản cũng bị vô hiệu hóa. Không tự đăng nhập sau đặt lại.
+
+Có thể kiểm thử email cục bộ với Mailpit: MAIL_HOST=localhost, MAIL_PORT=1025,
+MAIL_FROM=no-reply@mora.test, MAIL_SMTP_AUTH=false, MAIL_STARTTLS=false,
+MAIL_STARTTLS_REQUIRED=false. Cấu hình này chỉ dành cho môi trường phát triển.

@@ -6,6 +6,10 @@ import lombok.Getter;
 @Getter
 public enum ErrorCode {
     MESSAGE_NOT_FOUND(1035, "Không tìm thấy tin nhắn trong không gian này", HttpStatus.NOT_FOUND),
+    RESET_LINK_INVALID(1040, "Liên kết khôi phục không hợp lệ, đã hết hạn hoặc đã được sử dụng. Vui lòng yêu cầu liên kết mới.", HttpStatus.BAD_REQUEST),
+    RECOVERY_RATE_LIMITED(1041, "Bạn đã yêu cầu quá nhanh. Vui lòng chờ ít nhất 60 giây hoặc thử lại sau.", HttpStatus.TOO_MANY_REQUESTS),
+    RECOVERY_UNAVAILABLE(1042, "Dịch vụ gửi email chưa sẵn sàng. Vui lòng thử lại sau.", HttpStatus.SERVICE_UNAVAILABLE),
+    RESET_PASSWORD_INVALID(1043, "Mật khẩu phải có ít nhất 6 ký tự và không vượt quá 72 byte UTF-8.", HttpStatus.BAD_REQUEST),
     UNCATEGORIZED_EXCEPTION(9999, "Lỗi không xác định", HttpStatus.INTERNAL_SERVER_ERROR),
     INVALID_KEY(1001, "Dữ liệu yêu cầu không hợp lệ", HttpStatus.BAD_REQUEST),
     USER_EXISTED(1002, "Người dùng đã tồn tại", HttpStatus.BAD_REQUEST),

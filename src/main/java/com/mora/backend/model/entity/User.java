@@ -47,6 +47,10 @@ public class User {
     @Builder.Default
     private boolean active = true;
 
+    @Column(name = "credential_version", nullable = false)
+    @org.hibernate.annotations.ColumnDefault("0")
+    private long credentialVersion;
+
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
