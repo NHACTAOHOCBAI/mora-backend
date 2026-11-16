@@ -31,15 +31,14 @@ public class SpaceRealtimeController {
     ) {
         if (principal == null) return;
 
-        Optional<User> userOpt = userRepository.findByUsername(principal.getName());
+        Optional<User> userOpt = userRepository.findById(Long.valueOf(principal.getName()));
         if (userOpt.isEmpty()) return;
 
         User user = userOpt.get();
         TypingNotificationResponse response = TypingNotificationResponse.builder()
                 .spaceId(spaceId)
                 .userId(user.getId())
-                .username(user.getUsername())
-                .fullName(user.getFullName() != null ? user.getFullName() : user.getUsername())
+                .fullName(user.displayName())
                 .avatarUrl(user.getAvatarUrl())
                 .typing(request.isTyping())
                 .build();

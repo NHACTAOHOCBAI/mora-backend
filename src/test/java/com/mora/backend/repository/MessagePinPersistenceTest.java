@@ -23,7 +23,7 @@ class MessagePinPersistenceTest {
 
     @Test
     void pinUsesMessageIdAndCascadesWhenHistoryOrWorkspaceIsDeleted() {
-        var user = User.builder().username("pin-test").email("pin@test.example").password("unused")
+        var user = User.builder().email("pin@test.example").password("unused")
                 .fullName("Pin Test").role(Role.ROLE_USER).build();
         em.persist(user);
         var space = Space.builder().name("Test").user(user).build();
@@ -52,7 +52,7 @@ class MessagePinPersistenceTest {
     void concurrentPinsProduceOneRecordAndPreserveFirstAuthor() throws Exception {
         var tx = new org.springframework.transaction.support.TransactionTemplate(transactions);
         Long[] ids = tx.execute(status -> {
-            var user = User.builder().username("concurrent-pin").email("concurrent@pin.example")
+            var user = User.builder().email("concurrent@pin.example")
                     .password("unused").fullName("Concurrent Pin").role(Role.ROLE_USER).build();
             em.persist(user);
             var space = Space.builder().name("Concurrent").user(user).build();
@@ -63,7 +63,7 @@ class MessagePinPersistenceTest {
         });
         var users = org.mockito.Mockito.mock(com.mora.backend.service.UserService.class);
         org.mockito.Mockito.when(users.getCurrentUser()).thenReturn(
-                User.builder().id(ids[0]).username("concurrent-pin").role(Role.ROLE_USER).build());
+                User.builder().id(ids[0]).fullName("Concurrent Pin").role(Role.ROLE_USER).build());
         var notifier = org.mockito.Mockito.mock(com.mora.backend.service.ChatStateNotifier.class);
         var service = new com.mora.backend.service.impl.MessagePinServiceImpl(
                 spaces, null, messages, pins, users, notifier);

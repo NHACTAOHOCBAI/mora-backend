@@ -55,9 +55,9 @@ public class WebSocketAuthInterceptor implements ChannelInterceptor {
                 }
 
                 try {
-                    String username = jwtTokenProvider.extractUsername(authHeader);
-                    if (username != null) {
-                        UserDetails userDetails = userDetailsService.loadUserByUsername(username);
+                    String userId = jwtTokenProvider.extractUserId(authHeader);
+                    if (userId != null) {
+                        UserDetails userDetails = userDetailsService.loadById(userId);
                         if (jwtTokenProvider.isTokenValid(authHeader, userDetails)) {
                             UsernamePasswordAuthenticationToken auth = new UsernamePasswordAuthenticationToken(
                                     userDetails,
@@ -65,7 +65,7 @@ public class WebSocketAuthInterceptor implements ChannelInterceptor {
                                     userDetails.getAuthorities()
                             );
                             accessor.setUser(auth);
-                            log.info("[WebSocket] User '{}' đã kết nối và xác thực thành công", username);
+                            log.info("[WebSocket] User '{}' đã kết nối và xác thực thành công", userId);
                         }
                     }
                 } catch (Exception e) {
@@ -91,11 +91,11 @@ public class WebSocketAuthInterceptor implements ChannelInterceptor {
                         throw new SecurityException("Yêu cầu xác thực để nhận tin từ Không gian học tập này.");
                     }
 
-                    String username = principal.getName();
-                    Optional<User> userOpt = userRepository.findByUsername(username);
+                    String userId = principal.getName();
+                    Optional<User> userOpt = userRepository.findById(Long.valueOf(userId));
 
                     if (userOpt.isEmpty()) {
-                        throw new SecurityException("Không tìm thấy thông tin người dùng: " + username);
+                        throw new SecurityException("Không tìm thấy thông tin người dùng: " + userId);
                     }
 
                     User user = userOpt.get();
@@ -104,12 +104,12 @@ public class WebSocketAuthInterceptor implements ChannelInterceptor {
                         boolean isMember = spaceMemberRepository.existsBySpaceIdAndUserId(spaceId, user.getId());
 
                         if (!isOwner && !isMember) {
-                            log.warn("[WebSocket] Từ chối SUBSCRIBE: User '{}' không phải thành viên Space #{}", username, spaceId);
+                            log.warn("[WebSocket] Từ chối SUBSCRIBE: User '{}' không phải thành viên Space #{}", userId, spaceId);
                             throw new SecurityException("Bạn không phải thành viên của Không gian học tập này.");
                         }
                     }
 
-                    log.info("[WebSocket] User '{}' đăng ký lắng nghe thành công kênh: {}", username, destination);
+                    log.info("[WebSocket] User '{}' đăng ký lắng nghe thành công kênh: {}", userId, destination);
                 }
             }
         }

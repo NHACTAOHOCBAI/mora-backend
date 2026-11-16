@@ -19,7 +19,7 @@ public class ChatMessageResponse {
     private MessageType messageType; // USER_MESSAGE, AI_QUERY, AI_RESPONSE
     private String text;
     private Long userId;
-    private String userName;
+    private String fullName;
     private String userAvatar;
     private LocalDateTime timestamp;
     private String condensedQuestion;

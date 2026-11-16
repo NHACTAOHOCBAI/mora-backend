@@ -12,7 +12,6 @@ import lombok.NoArgsConstructor;
 public class TypingNotificationResponse {
     private Long spaceId;
     private Long userId;
-    private String username;
     private String fullName;
     private String avatarUrl;
     private boolean typing;

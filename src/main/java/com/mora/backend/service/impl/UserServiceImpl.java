@@ -51,18 +51,13 @@ public class UserServiceImpl implements UserService {
     @Override
     @Transactional
     public UserResponse register(RegisterRequest request) {
-        log.info("Registering user: {}", request.getUsername());
-
-        if (userRepository.existsByUsername(request.getUsername())) {
-            throw new AppException(ErrorCode.USER_EXISTED);
-        }
+        log.info("Registering user: {}", request.getEmail());
 
         if (userRepository.existsByEmail(request.getEmail())) {
             throw new AppException(ErrorCode.USER_EXISTED);
         }
 
         User user = User.builder()
-                .username(request.getUsername())
                 .password(passwordEncoder.encode(request.getPassword()))
                 .email(request.getEmail())
                 .fullName(request.getFullName())
@@ -78,18 +73,18 @@ public class UserServiceImpl implements UserService {
     @Override
     @Transactional(readOnly = true)
     public AuthResponse login(LoginRequest request) {
-        log.info("Logging in user: {}", request.getUsername());
+        log.info("Logging in user: {}", request.getEmail());
 
         try {
             Authentication authentication = authenticationManager.authenticate(
                     new UsernamePasswordAuthenticationToken(
-                            request.getUsername(),
+                            request.getEmail(),
                             request.getPassword()
                     )
             );
 
             UserDetails userDetails = (UserDetails) authentication.getPrincipal();
-            User user = userRepository.findByUsername(userDetails.getUsername())
+            User user = userRepository.findById(Long.valueOf(userDetails.getUsername()))
                     .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
 
             if (!user.isActive()) {
@@ -100,13 +95,12 @@ public class UserServiceImpl implements UserService {
 
             return AuthResponse.builder()
                     .token(token)
-                    .username(user.getUsername())
                     .email(user.getEmail())
                     .fullName(user.getFullName())
                     .role(user.getRole())
                     .build();
         } catch (Exception e) {
-            log.warn("Login failed for user: {}. Reason: {}", request.getUsername(), e.getMessage());
+            log.warn("Login failed for user: {}. Reason: {}", request.getEmail(), e.getMessage());
             throw new AppException(ErrorCode.UNAUTHENTICATED);
         }
     }
@@ -124,7 +118,7 @@ public class UserServiceImpl implements UserService {
         }
 
         UserDetails userDetails = new org.springframework.security.core.userdetails.User(
-                user.getUsername(),
+                user.getId().toString(),
                 user.getPassword(),
                 List.of(new SimpleGrantedAuthority(user.getRole().name()))
         );
@@ -133,7 +127,6 @@ public class UserServiceImpl implements UserService {
 
         return AuthResponse.builder()
                 .token(token)
-                .username(user.getUsername())
                 .email(user.getEmail())
                 .fullName(user.getFullName())
                 .role(user.getRole())
@@ -148,14 +141,14 @@ public class UserServiceImpl implements UserService {
             throw new AppException(ErrorCode.UNAUTHENTICATED);
         }
 
-        String username;
+        String accountId;
         if (authentication.getPrincipal() instanceof UserDetails) {
-            username = ((UserDetails) authentication.getPrincipal()).getUsername();
+            accountId = ((UserDetails) authentication.getPrincipal()).getUsername();
         } else {
-            username = authentication.getName();
+            accountId = authentication.getName();
         }
 
-        return userRepository.findByUsername(username)
+        return userRepository.findById(Long.valueOf(accountId))
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
     }
 
@@ -235,7 +228,7 @@ public class UserServiceImpl implements UserService {
             throw new AppException(ErrorCode.INVALID_FILE_FORMAT);
         }
 
-        String avatarUrl = "https://api.dicebear.com/7.x/adventurer/svg?seed=" + user.getUsername();
+        String avatarUrl = "https://api.dicebear.com/7.x/adventurer/svg?seed=" + user.getId();
         user.setAvatarUrl(avatarUrl);
         user = userRepository.save(user);
         return mapToUserResponse(user);
@@ -273,7 +266,6 @@ public class UserServiceImpl implements UserService {
     private UserResponse mapToUserResponse(User user) {
         return UserResponse.builder()
                 .id(user.getId())
-                .username(user.getUsername())
                 .email(user.getEmail())
                 .fullName(user.getFullName())
                 .role(user.getRole())

@@ -55,7 +55,7 @@ public class SpaceServiceImpl implements SpaceService {
                 .build();
         spaceMemberRepository.save(ownerMember);
 
-        log.info("Space created successfully with ID {} by user {}", space.getId(), currentUser.getUsername());
+        log.info("Space created successfully with ID {} by user {}", space.getId(), currentUser.getEmail());
         return convertToSpaceResponse(space, SpaceRole.OWNER, 1, 0);
     }
 
@@ -106,7 +106,7 @@ public class SpaceServiceImpl implements SpaceService {
                         .spaceId(d.getSpace().getId())
                         .status(d.getStatus())
                         .uploadedById(d.getUploadedBy() != null ? d.getUploadedBy().getId() : null)
-                        .uploadedByName(d.getUploadedBy() != null ? (d.getUploadedBy().getFullName() != null ? d.getUploadedBy().getFullName() : d.getUploadedBy().getUsername()) : null)
+                        .uploadedByName(d.getUploadedBy() != null ? (d.getUploadedBy().displayName()) : null)
                         .createdAt(d.getCreatedAt())
                         .build())
                 .toList();
@@ -117,7 +117,7 @@ public class SpaceServiceImpl implements SpaceService {
                 .toList();
 
         String ownerName = space.getUser() != null
-                ? (space.getUser().getFullName() != null ? space.getUser().getFullName() : space.getUser().getUsername())
+                ? (space.getUser().displayName())
                 : "System";
 
         return SpaceDetailResponse.builder()
@@ -166,7 +166,7 @@ public class SpaceServiceImpl implements SpaceService {
 
         // 5. Delete the space itself
         spaceRepository.delete(space);
-        log.info("Space {} successfully deleted by user {}", id, currentUser.getUsername());
+        log.info("Space {} successfully deleted by user {}", id, currentUser.getEmail());
     }
 
     @Override
@@ -194,9 +194,8 @@ public class SpaceServiceImpl implements SpaceService {
             throw new AppException(ErrorCode.SPACE_ACCESS_DENIED);
         }
 
-        String search = request.getUsernameOrEmail().trim();
-        User targetUser = userRepository.findByUsername(search)
-                .or(() -> userRepository.findByEmail(search))
+        String search = request.getEmail().trim();
+        User targetUser = userRepository.findByEmail(search)
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
 
         if (spaceMemberRepository.existsBySpaceIdAndUserId(spaceId, targetUser.getId())) {
@@ -210,7 +209,7 @@ public class SpaceServiceImpl implements SpaceService {
                 .build();
         member = spaceMemberRepository.save(member);
 
-        log.info("Added user {} to space {} as {}", targetUser.getUsername(), spaceId, member.getRole());
+        log.info("Added user {} to space {} as {}", targetUser.getEmail(), spaceId, member.getRole());
         return convertToMemberResponse(member);
     }
 
@@ -370,7 +369,7 @@ public class SpaceServiceImpl implements SpaceService {
         boolean isAlreadyMember = spaceMemberRepository.existsBySpaceIdAndUserId(space.getId(), currentUser.getId());
 
         String inviterName = invitation.getInviter() != null
-                ? (invitation.getInviter().getFullName() != null ? invitation.getInviter().getFullName() : invitation.getInviter().getUsername())
+                ? (invitation.getInviter().displayName())
                 : "Thành viên nhóm";
 
         return SpaceJoinPreviewResponse.builder()
@@ -421,13 +420,13 @@ public class SpaceServiceImpl implements SpaceService {
         int memberCount = spaceMemberRepository.findBySpaceId(space.getId()).size();
         int docCount = documentRepository.findBySpaceId(space.getId()).size();
 
-        log.info("User {} joined space {} via code {} as {}", currentUser.getUsername(), space.getId(), inviteCode, invitation.getRole());
+        log.info("User {} joined space {} via code {} as {}", currentUser.getEmail(), space.getId(), inviteCode, invitation.getRole());
         return convertToSpaceResponse(space, invitation.getRole(), memberCount, docCount);
     }
 
     private SpaceResponse convertToSpaceResponse(Space space, SpaceRole role, int memberCount, int documentCount) {
         String ownerName = space.getUser() != null
-                ? (space.getUser().getFullName() != null ? space.getUser().getFullName() : space.getUser().getUsername())
+                ? (space.getUser().displayName())
                 : "System";
 
         return SpaceResponse.builder()
@@ -448,7 +447,7 @@ public class SpaceServiceImpl implements SpaceService {
         return SpaceMemberResponse.builder()
                 .id(member.getId())
                 .userId(u.getId())
-                .username(u.getUsername())
+                .email(u.getEmail())
                 .fullName(u.getFullName())
                 .avatarUrl(u.getAvatarUrl())
                 .role(member.getRole())
@@ -458,7 +457,7 @@ public class SpaceServiceImpl implements SpaceService {
 
     private SpaceInvitationResponse convertToInvitationResponse(SpaceInvitation inv) {
         String inviterName = inv.getInviter() != null
-                ? (inv.getInviter().getFullName() != null ? inv.getInviter().getFullName() : inv.getInviter().getUsername())
+                ? (inv.getInviter().displayName())
                 : "System";
 
         return SpaceInvitationResponse.builder()

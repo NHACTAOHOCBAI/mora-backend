@@ -44,7 +44,7 @@ public class DocumentServiceImpl implements DocumentService {
 
         SpaceRole userRole = getUserRole(space, currentUser);
         if (currentUser.getRole() != Role.ROLE_ADMIN && (userRole == null || userRole == SpaceRole.VIEWER)) {
-            log.warn("User {} has role {} in space {}, cannot upload documents", currentUser.getUsername(), userRole, spaceId);
+            log.warn("User {} has role {} in space {}, cannot upload documents", currentUser.getEmail(), userRole, spaceId);
             throw new AppException(ErrorCode.SPACE_ACCESS_DENIED);
         }
 
@@ -107,7 +107,7 @@ public class DocumentServiceImpl implements DocumentService {
         boolean isOwner = userRole == SpaceRole.OWNER || currentUser.getRole() == Role.ROLE_ADMIN;
 
         if (!isOwner && !isUploader) {
-            log.warn("User {} is neither owner nor uploader of doc {}, deletion denied", currentUser.getUsername(), documentId);
+            log.warn("User {} is neither owner nor uploader of doc {}, deletion denied", currentUser.getEmail(), documentId);
             throw new AppException(ErrorCode.SPACE_ACCESS_DENIED);
         }
 

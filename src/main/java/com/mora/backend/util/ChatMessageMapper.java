@@ -45,7 +45,7 @@ public final class ChatMessageMapper {
         }
 
         User u = msg.getUser();
-        String userName = u != null ? (u.getFullName() != null ? u.getFullName() : u.getUsername()) : null;
+        String fullName = u != null ? (u.displayName()) : null;
         String userAvatar = u != null ? u.getAvatarUrl() : null;
         Long userId = u != null ? u.getId() : null;
 
@@ -55,7 +55,7 @@ public final class ChatMessageMapper {
                 .messageType(msg.getMessageType())
                 .text(msg.getText())
                 .userId(userId)
-                .userName(userName)
+                .fullName(fullName)
                 .userAvatar(userAvatar)
                 .timestamp(msg.getCreatedAt())
                 .condensedQuestion(msg.getCondensedQuestion())

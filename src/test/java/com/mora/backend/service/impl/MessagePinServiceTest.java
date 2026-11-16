@@ -28,7 +28,7 @@ class MessagePinServiceTest {
     @Mock ChatStateNotifier notifier;
     @InjectMocks MessagePinServiceImpl service;
 
-    final User owner = User.builder().id(1L).username("owner").role(Role.ROLE_USER).build();
+    final User owner = User.builder().id(1L).role(Role.ROLE_USER).build();
     final Space space = Space.builder().id(2L).user(owner).build();
     final ChatMessage message = ChatMessage.builder().id(3L).space(space).sender("assistant")
             .text("Important answer").messageType(MessageType.AI_RESPONSE).build();
@@ -42,7 +42,7 @@ class MessagePinServiceTest {
     @EnumSource(SpaceRole.class)
     void allMemberRolesCanPinAndUnpin(SpaceRole role) {
         User user = role == SpaceRole.OWNER ? owner :
-                User.builder().id(9L).username("member").role(Role.ROLE_USER).build();
+                User.builder().id(9L).role(Role.ROLE_USER).build();
         setupMutation(user);
         if (role != SpaceRole.OWNER) when(members.existsBySpaceIdAndUserId(2L, 9L)).thenReturn(true);
         when(messages.findById(3L)).thenReturn(Optional.of(message));
@@ -57,7 +57,7 @@ class MessagePinServiceTest {
 
     @Test
     void administratorCanPinWithoutMembership() {
-        setupMutation(User.builder().id(99L).username("admin").role(Role.ROLE_ADMIN).build());
+        setupMutation(User.builder().id(99L).role(Role.ROLE_ADMIN).build());
         when(messages.findById(3L)).thenReturn(Optional.of(message));
         service.pin(2L, 3L);
         verify(pins).save(any());

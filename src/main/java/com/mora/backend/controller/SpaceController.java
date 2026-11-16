@@ -88,7 +88,7 @@ public class SpaceController {
     }
 
     @PostMapping("/{id}/members")
-    @Operation(summary = "Thêm thành viên vào Không gian học tập bằng username/email (Chỉ OWNER)")
+    @Operation(summary = "Thêm thành viên vào Không gian học tập bằng email (Chỉ OWNER)")
     public ResponseEntity<ApiResponse<SpaceMemberResponse>> addSpaceMember(
             @PathVariable("id") Long id,
             @Valid @RequestBody SpaceMemberAddRequest request) {

@@ -33,7 +33,7 @@ class OpenAiChatServiceTest {
 
     @Test
     void newUserCanChatWithoutAnyPersonalAiConfiguration() {
-        var user = User.builder().id(1L).username("new-user").role(Role.ROLE_USER).build();
+        var user = User.builder().id(1L).role(Role.ROLE_USER).build();
         var space = Space.builder().id(2L).user(user).build();
         when(users.getCurrentUser()).thenReturn(user);
         when(spaces.findById(2L)).thenReturn(Optional.of(space));

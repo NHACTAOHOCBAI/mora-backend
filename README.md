@@ -157,3 +157,23 @@ docker compose --env-file .env up --build
 Đặt `AI_REINDEX_ON_STARTUP=true` để chạy tác vụ backend đọc lại `document_pages` và index qua AI Service. Tác vụ báo kết quả từng tài liệu và tổng thành công/thất bại; có lỗi sẽ không hoàn tất startup. Sau khi thành công, đặt biến này về `false` và bật retrieval tại AI Service. Xem [quy trình chuyển đổi](../mora-ai/README.md#chuyển-chỉ-mục-sang-openai).
 
 Backend không lưu hoặc truyền key/model AI của người dùng. Không còn API `/api/user/ai-settings` và kiểm tra key. Các bảng cũ được giữ nhưng ngừng sử dụng; schema mới không tạo chúng.
+
+
+### Email-only accounts
+
+Login accepts `{ "email": "person@example.com", "password": "..." }`; registration
+accepts `email`, `fullName`, and `password`. Member addition accepts `email` and
+`role`. Account responses no longer contain an account handle; chat sender names
+use `fullName`, and member responses include `email`.
+
+JWT subjects are immutable user IDs with `tokenVersion: 2`. Existing sessions
+must sign in again. Admin seeding identifies accounts by `MORA_ADMIN_EMAIL`.
+
+Before deploying, back up PostgreSQL and stop the old backend. Deploy frontend
+and backend together. Startup `schema.sql` removes the obsolete `users.username`
+column using `DROP COLUMN IF EXISTS` without CASCADE. User IDs, password hashes,
+roles and related records are preserved. Repeated startup is safe. Because SQL
+initialization currently continues on errors, verify the column was removed; if
+an external dependency blocks removal, resolve it explicitly before reopening
+traffic. Rolling back requires the backup, since discarded handles cannot be
+reconstructed. Do not run the application context test against a production DB.

@@ -62,7 +62,7 @@ public class ChatServiceImpl implements ChatService {
                 .build();
         userMessage = chatMessageRepository.save(userMessage);
 
-        log.info("Saved group message from user {} in space {}", currentUser.getUsername(), space.getId());
+        log.info("Saved group message from user {} in space {}", currentUser.getEmail(), space.getId());
         ChatMessageResponse response = mapToResponse(userMessage);
 
         try {

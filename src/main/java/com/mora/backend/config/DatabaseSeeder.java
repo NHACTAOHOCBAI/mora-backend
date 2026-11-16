@@ -20,9 +20,6 @@ public class DatabaseSeeder implements CommandLineRunner {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
 
-    @Value("${mora.admin.username}")
-    private String adminUsername;
-
     @Value("${mora.admin.password}")
     private String adminPassword;
 
@@ -35,24 +32,20 @@ public class DatabaseSeeder implements CommandLineRunner {
     @Override
     public void run(String... args) {
         try {
-            java.util.Optional<User> adminOpt = userRepository.findByUsername(adminUsername);
-            if (adminOpt.isEmpty()) {
-                adminOpt = userRepository.findByEmail(adminEmail);
-            }
+            java.util.Optional<User> adminOpt = userRepository.findByEmail(adminEmail);
             
             adminOpt.ifPresentOrElse(
                 admin -> {
                     if (admin.getRole() != Role.ROLE_ADMIN) {
                         admin.setRole(Role.ROLE_ADMIN);
                         userRepository.save(admin);
-                        log.info("Successfully restored Admin role to user: {}", admin.getUsername());
+                        log.info("Successfully restored Admin role to user: {}", admin.getEmail());
                     } else {
                         log.info("Admin user already has ROLE_ADMIN. Skipping restoration.");
                     }
                 },
                 () -> {
                     User admin = User.builder()
-                            .username(adminUsername)
                             .password(passwordEncoder.encode(adminPassword))
                             .email(adminEmail)
                             .fullName(adminFullName)
@@ -61,7 +54,7 @@ public class DatabaseSeeder implements CommandLineRunner {
                             .build();
 
                     userRepository.save(admin);
-                    log.info("Successfully seeded default Admin user: {}", adminUsername);
+                    log.info("Successfully seeded default Admin user: {}", adminEmail);
                 }
             );
         } catch (Exception e) {

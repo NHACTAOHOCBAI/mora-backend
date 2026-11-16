@@ -39,8 +39,13 @@ public class JwtTokenProvider {
         return Keys.hmacShaKeyFor(keyBytes);
     }
 
-    public String extractUsername(String token) {
-        return extractClaim(token, Claims::getSubject);
+    public String extractUserId(String token) {
+        Claims claims = extractAllClaims(token);
+        if (!Integer.valueOf(2).equals(claims.get("tokenVersion", Integer.class))) {
+            throw new IllegalArgumentException("Please sign in again");
+        }
+        Long.parseLong(claims.getSubject());
+        return claims.getSubject();
     }
 
     public <T> T extractClaim(String token, Function<Claims, T> claimsResolver) {
@@ -55,6 +60,7 @@ public class JwtTokenProvider {
     public String generateToken(Map<String, Object> extraClaims, UserDetails userDetails) {
         return Jwts.builder()
                 .claims(extraClaims)
+                .claim("tokenVersion", 2)
                 .subject(userDetails.getUsername())
                 .issuedAt(new Date(System.currentTimeMillis()))
                 .expiration(new Date(System.currentTimeMillis() + jwtExpiration))
@@ -63,8 +69,8 @@ public class JwtTokenProvider {
     }
 
     public boolean isTokenValid(String token, UserDetails userDetails) {
-        final String username = extractUsername(token);
-        return (username.equals(userDetails.getUsername())) && !isTokenExpired(token);
+        final String userId = extractUserId(token);
+        return (userId.equals(userDetails.getUsername())) && !isTokenExpired(token);
     }
 
     private boolean isTokenExpired(String token) {

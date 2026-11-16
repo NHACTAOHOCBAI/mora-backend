@@ -95,7 +95,7 @@ public class DocumentController {
 
     private DocumentResponse convertToResponse(Document doc) {
         String uploadedByName = doc.getUploadedBy() != null
-                ? (doc.getUploadedBy().getFullName() != null ? doc.getUploadedBy().getFullName() : doc.getUploadedBy().getUsername())
+                ? (doc.getUploadedBy().displayName())
                 : null;
 
         return DocumentResponse.builder()

@@ -66,8 +66,7 @@ public class MessagePinServiceImpl implements MessagePinService {
         if (pins.existsById(messageId)) return;
         pins.save(MessagePin.builder().message(message)
                 .pinnedByUserId(user.getId())
-                .pinnedByName(user.getFullName() == null || user.getFullName().isBlank()
-                        ? user.getUsername() : user.getFullName())
+                .pinnedByName(user.displayName())
                 .pinnedAt(LocalDateTime.now()).build());
         notifier.changed(spaceId, false);
     }

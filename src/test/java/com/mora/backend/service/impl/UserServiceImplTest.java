@@ -54,7 +54,7 @@ class UserServiceImplTest {
     void setUp() {
         user = User.builder()
                 .id(1L)
-                .username("testuser")
+
                 .password("encoded_password")
                 .email("testuser@example.com")
                 .fullName("Test User")
@@ -63,19 +63,17 @@ class UserServiceImplTest {
                 .build();
 
         registerRequest = new RegisterRequest();
-        registerRequest.setUsername("testuser");
         registerRequest.setPassword("password123");
         registerRequest.setEmail("testuser@example.com");
         registerRequest.setFullName("Test User");
 
         loginRequest = new LoginRequest();
-        loginRequest.setUsername("testuser");
+        loginRequest.setEmail("testuser@example.com");
         loginRequest.setPassword("password123");
     }
 
     @Test
     void register_Success() {
-        when(userRepository.existsByUsername(registerRequest.getUsername())).thenReturn(false);
         when(userRepository.existsByEmail(registerRequest.getEmail())).thenReturn(false);
         when(passwordEncoder.encode(registerRequest.getPassword())).thenReturn("encoded_password");
         when(userRepository.save(any(User.class))).thenReturn(user);
@@ -83,14 +81,13 @@ class UserServiceImplTest {
         UserResponse response = userService.register(registerRequest);
 
         assertNotNull(response);
-        assertEquals(user.getUsername(), response.getUsername());
         assertEquals(user.getEmail(), response.getEmail());
         verify(userRepository, times(1)).save(any(User.class));
     }
 
     @Test
     void register_UserExisted() {
-        when(userRepository.existsByUsername(registerRequest.getUsername())).thenReturn(true);
+        when(userRepository.existsByEmail(registerRequest.getEmail())).thenReturn(true);
 
         AppException exception = assertThrows(AppException.class, () -> userService.register(registerRequest));
         assertEquals(ErrorCode.USER_EXISTED, exception.getErrorCode());
@@ -101,18 +98,18 @@ class UserServiceImplTest {
     void login_Success() {
         Authentication authentication = mock(Authentication.class);
         UserDetails userDetails = mock(UserDetails.class);
-        
+
         when(authenticationManager.authenticate(any(UsernamePasswordAuthenticationToken.class))).thenReturn(authentication);
         when(authentication.getPrincipal()).thenReturn(userDetails);
-        when(userDetails.getUsername()).thenReturn("testuser");
-        when(userRepository.findByUsername("testuser")).thenReturn(Optional.of(user));
+        when(userDetails.getUsername()).thenReturn("1");
+        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
         when(jwtTokenProvider.generateToken(userDetails)).thenReturn("dummy_token");
 
         AuthResponse response = userService.login(loginRequest);
 
         assertNotNull(response);
         assertEquals("dummy_token", response.getToken());
-        assertEquals("testuser", response.getUsername());
+        assertEquals("testuser@example.com", response.getEmail());
     }
 
     @Test

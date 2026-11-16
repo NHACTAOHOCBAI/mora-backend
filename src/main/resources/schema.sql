@@ -1,7 +1,6 @@
 -- Schema DDL for MORA Backend
 CREATE TABLE IF NOT EXISTS users (
     id BIGSERIAL PRIMARY KEY,
-    username VARCHAR(50) NOT NULL UNIQUE,
     password VARCHAR(100) NOT NULL,
     email VARCHAR(100) NOT NULL UNIQUE,
     full_name VARCHAR(100) NOT NULL,
@@ -110,3 +109,6 @@ CREATE TABLE IF NOT EXISTS quiz_questions (
     question TEXT NOT NULL, options_json TEXT NOT NULL, correct_option_index INT NOT NULL,
     explanation TEXT NOT NULL, document_id BIGINT, document_name VARCHAR(255), page_number INT, source_quote TEXT
 );
+
+-- Remove obsolete account handle on existing installations (no cascading deletes).
+ALTER TABLE users DROP COLUMN IF EXISTS username;

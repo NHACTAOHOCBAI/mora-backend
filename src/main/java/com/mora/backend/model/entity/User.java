@@ -18,12 +18,14 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 public class User {
 
+    public String displayName() {
+        return fullName == null || fullName.isBlank() ? "Thành viên" : fullName;
+    }
+
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-
-    @Column(name = "username", nullable = false, unique = true, length = 50)
-    private String username;
 
     @Column(name = "password", nullable = false, length = 100)
     private String password;
