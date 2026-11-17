@@ -14,6 +14,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Service
@@ -48,6 +49,9 @@ public class DocumentAsyncProcessor {
             
             doc.setStorageUrl(storageUrl);
             doc.setStatus(DocumentStatus.PARSING);
+            doc.setFailureCode(null);
+            doc.setFailureMessage(null);
+            doc.setFailedAt(null);
             doc = documentRepository.save(doc);
 
             // 2. Extract text (Parsing via Python AI Service Parser)
@@ -83,12 +87,18 @@ public class DocumentAsyncProcessor {
 
             // Update status to READY
             doc.setStatus(DocumentStatus.READY);
+            doc.setFailureCode(null);
+            doc.setFailureMessage(null);
+            doc.setFailedAt(null);
             documentRepository.save(doc);
             log.info("Async processing completed successfully for document ID: {}", documentId);
 
         } catch (Exception e) {
             log.error("Error occurred during async processing of document ID: {}", documentId, e);
             doc.setStatus(DocumentStatus.FAILED);
+            doc.setFailureCode("PROCESSING_FAILED");
+            doc.setFailureMessage("Không thể xử lý tài liệu. Vui lòng kiểm tra định dạng tệp hoặc thử lại sau.");
+            doc.setFailedAt(LocalDateTime.now());
             documentRepository.save(doc);
         }
     }

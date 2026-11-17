@@ -39,6 +39,15 @@ public class Document {
     @Builder.Default
     private DocumentStatus status = DocumentStatus.UPLOADING;
 
+    @Column(name = "failure_code", length = 80)
+    private String failureCode;
+
+    @Column(name = "failure_message", length = 500)
+    private String failureMessage;
+
+    @Column(name = "failed_at")
+    private LocalDateTime failedAt;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "space_id", nullable = false)
     private Space space;

@@ -133,6 +133,11 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS terms_accepted_at TIMESTAMP;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS privacy_accepted_version VARCHAR(20);
 ALTER TABLE users ADD COLUMN IF NOT EXISTS privacy_accepted_at TIMESTAMP;
 
+-- Safe, user-facing failure metadata for the admin operations console.
+ALTER TABLE documents ADD COLUMN IF NOT EXISTS failure_code VARCHAR(80);
+ALTER TABLE documents ADD COLUMN IF NOT EXISTS failure_message VARCHAR(500);
+ALTER TABLE documents ADD COLUMN IF NOT EXISTS failed_at TIMESTAMP;
+
 -- Dashboard "Tiếp tục học": retain a lightweight timestamp for recent activity.
 ALTER TABLE spaces ADD COLUMN IF NOT EXISTS last_activity_at TIMESTAMP;
 UPDATE spaces SET last_activity_at = COALESCE(last_activity_at, updated_at, created_at);

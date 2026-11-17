@@ -8,6 +8,8 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
 @Repository
 public interface SpaceRepository extends JpaRepository<Space, Long> {
@@ -21,4 +23,10 @@ public interface SpaceRepository extends JpaRepository<Space, Long> {
     List<Space> findAllAccessibleSpaces(@Param("user") User user);
 
     boolean existsByIdAndUserId(Long id, Long userId);
+
+    @Query("SELECT s FROM Space s WHERE :search IS NULL OR :search = '' OR " +
+            "LOWER(s.name) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
+            "LOWER(COALESCE(s.description, '')) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
+            "LOWER(s.user.fullName) LIKE LOWER(CONCAT('%', :search, '%'))")
+    Page<Space> searchForAdmin(@Param("search") String search, Pageable pageable);
 }
