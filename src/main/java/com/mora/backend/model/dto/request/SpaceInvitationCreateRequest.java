@@ -19,5 +19,4 @@ public class SpaceInvitationCreateRequest {
 
     private Integer durationDays; // null hoặc <= 0 nghĩa là vĩnh viễn (hoặc mặc định 7 ngày)
 
-    private String inviteEmail;
 }

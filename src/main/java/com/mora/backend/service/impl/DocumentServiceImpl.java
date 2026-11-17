@@ -17,6 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Optional;
+import java.time.LocalDateTime;
 
 @Service
 @RequiredArgsConstructor
@@ -59,6 +60,8 @@ public class DocumentServiceImpl implements DocumentService {
                 .status(DocumentStatus.UPLOADING)
                 .build();
         doc = documentRepository.save(doc);
+        space.setLastActivityAt(LocalDateTime.now());
+        spaceRepository.save(space);
         final Long documentId = doc.getId();
 
         // 2. Trigger asynchronous processing AFTER transaction commits
@@ -122,6 +125,8 @@ public class DocumentServiceImpl implements DocumentService {
         studySetDocumentRepository.deleteByDocumentId(documentId);
         documentPageRepository.deleteByDocumentId(documentId);
         documentRepository.delete(doc);
+        space.setLastActivityAt(LocalDateTime.now());
+        spaceRepository.save(space);
         log.info("Deleted document and pages for ID: {}", documentId);
     }
 

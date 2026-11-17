@@ -21,6 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.time.LocalDateTime;
 
 @Service
 @RequiredArgsConstructor
@@ -61,6 +62,7 @@ public class ChatServiceImpl implements ChatService {
                 .space(space)
                 .build();
         userMessage = chatMessageRepository.save(userMessage);
+        touchActivity(space);
 
         log.info("Saved group message from user {} in space {}", currentUser.getEmail(), space.getId());
         ChatMessageResponse response = mapToResponse(userMessage);
@@ -149,6 +151,7 @@ public class ChatServiceImpl implements ChatService {
                 .space(space)
                 .build();
         userMessage = chatMessageRepository.save(userMessage);
+        touchActivity(space);
 
         try {
             ChatMessageResponse userQueryResponse = mapToResponse(userMessage);
@@ -282,6 +285,11 @@ public class ChatServiceImpl implements ChatService {
 
     private ChatMessageResponse mapToResponse(ChatMessage msg) {
         return com.mora.backend.util.ChatMessageMapper.toResponse(msg, objectMapper);
+    }
+
+    private void touchActivity(Space space) {
+        space.setLastActivityAt(LocalDateTime.now());
+        spaceRepository.save(space);
     }
 
     private SpaceRole getUserRole(Space space, User user) {

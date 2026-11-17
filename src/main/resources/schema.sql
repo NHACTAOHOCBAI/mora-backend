@@ -121,3 +121,12 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS terms_accepted_version VARCHAR(20);
 ALTER TABLE users ADD COLUMN IF NOT EXISTS terms_accepted_at TIMESTAMP;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS privacy_accepted_version VARCHAR(20);
 ALTER TABLE users ADD COLUMN IF NOT EXISTS privacy_accepted_at TIMESTAMP;
+
+-- Dashboard "Tiếp tục học": retain a lightweight timestamp for recent activity.
+ALTER TABLE spaces ADD COLUMN IF NOT EXISTS last_activity_at TIMESTAMP;
+UPDATE spaces SET last_activity_at = COALESCE(last_activity_at, updated_at, created_at);
+CREATE INDEX IF NOT EXISTS idx_spaces_last_activity_at ON spaces (last_activity_at DESC);
+
+-- Invitation links are shareable. Named recipients are managed by direct member addition.
+DROP INDEX IF EXISTS idx_space_invitations_recipient_pending;
+ALTER TABLE space_invitations DROP COLUMN IF EXISTS invite_email;

@@ -12,6 +12,7 @@ import com.mora.backend.service.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import java.time.LocalDateTime;
 import java.util.*;
 
 @Service @RequiredArgsConstructor
@@ -59,7 +60,10 @@ public class StudySetServiceImpl implements StudySetService {
             try { set.getQuizQuestions().add(QuizQuestion.builder().studySet(set).question(clean(question.question, "Câu hỏi")).optionsJson(mapper.writeValueAsString(question.options)).correctOptionIndex(question.correctOptionIndex).explanation(clean(question.explanation, "")).documentId(question.citation.documentId).documentName(question.citation.documentName).pageNumber(question.citation.pageNumber).sourceQuote(question.citation.quote).build()); }
             catch (Exception e) { throw new AppException(ErrorCode.AI_ENGINE_ERROR); }
         }
-        return toResponse(studySets.save(set));
+        StudySetResponse response = toResponse(studySets.save(set));
+        space.setLastActivityAt(LocalDateTime.now());
+        spaces.save(space);
+        return response;
     }
 
     @Override @Transactional(readOnly = true) public List<StudySetResponse> list(Long spaceId) { requireMember(spaceId); return studySets.findBySpaceIdOrderByCreatedAtDesc(spaceId).stream().map(this::toResponse).toList(); }

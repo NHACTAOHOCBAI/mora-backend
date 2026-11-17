@@ -18,6 +18,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -44,6 +45,7 @@ public class SpaceServiceImpl implements SpaceService {
                 .name(request.getName())
                 .description(request.getDescription())
                 .user(currentUser)
+                .lastActivityAt(LocalDateTime.now())
                 .build();
         space = spaceRepository.save(space);
 
@@ -78,6 +80,42 @@ public class SpaceServiceImpl implements SpaceService {
                     return convertToSpaceResponse(space, role, memberCount, docCount);
                 })
                 .toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public DashboardResponse getDashboard() {
+        User currentUser = userService.getCurrentUser();
+        List<Space> spaces = currentUser.getRole() == Role.ROLE_ADMIN
+                ? spaceRepository.findAll()
+                : spaceRepository.findAllAccessibleSpaces(currentUser);
+
+        List<SpaceResponse> recentSpaces = spaces.stream()
+                .sorted(Comparator.comparing(
+                        (Space space) -> space.getLastActivityAt() != null ? space.getLastActivityAt() : space.getUpdatedAt(),
+                        Comparator.nullsLast(Comparator.reverseOrder())))
+                .limit(3)
+                .map(space -> convertToSpaceResponse(space, getUserRoleInSpace(space.getId(), currentUser),
+                        spaceMemberRepository.findBySpaceId(space.getId()).size(), documentRepository.findBySpaceId(space.getId()).size()))
+                .toList();
+
+        List<DashboardResponse.ProcessingDocument> processingDocuments = spaces.stream()
+                .flatMap(space -> documentRepository.findBySpaceId(space.getId()).stream())
+                .filter(document -> document.getStatus() == DocumentStatus.UPLOADING
+                        || document.getStatus() == DocumentStatus.PARSING
+                        || document.getStatus() == DocumentStatus.INDEXING)
+                .sorted(Comparator.comparing(Document::getUpdatedAt, Comparator.nullsLast(Comparator.reverseOrder())))
+                .limit(5)
+                .map(document -> DashboardResponse.ProcessingDocument.builder()
+                        .id(document.getId()).name(document.getName()).status(document.getStatus())
+                        .spaceId(document.getSpace().getId()).spaceName(document.getSpace().getName())
+                        .updatedAt(document.getUpdatedAt()).build())
+                .toList();
+
+        return DashboardResponse.builder()
+                .recentSpaces(recentSpaces)
+                .processingDocuments(processingDocuments)
+                .build();
     }
 
     @Override
@@ -307,7 +345,6 @@ public class SpaceServiceImpl implements SpaceService {
                 .space(space)
                 .inviter(currentUser)
                 .inviteCode(inviteCode)
-                .inviteEmail(request.getInviteEmail())
                 .role(request.getRole() != null ? request.getRole() : SpaceRole.EDITOR)
                 .status(InvitationStatus.PENDING)
                 .expiresAt(expiresAt)
@@ -451,6 +488,7 @@ public class SpaceServiceImpl implements SpaceService {
                 .description(space.getDescription())
                 .createdAt(space.getCreatedAt())
                 .updatedAt(space.getUpdatedAt())
+                .lastActivityAt(space.getLastActivityAt())
                 .currentUserRole(role)
                 .memberCount(memberCount)
                 .documentCount(documentCount)
@@ -481,7 +519,6 @@ public class SpaceServiceImpl implements SpaceService {
                 .spaceId(inv.getSpace().getId())
                 .spaceName(inv.getSpace().getName())
                 .inviteCode(inv.getInviteCode())
-                .inviteEmail(inv.getInviteEmail())
                 .role(inv.getRole())
                 .status(inv.getStatus())
                 .expiresAt(inv.getExpiresAt())

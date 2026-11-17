@@ -32,9 +32,6 @@ public class SpaceInvitation {
     @Column(name = "invite_code", nullable = false, unique = true, length = 64)
     private String inviteCode;
 
-    @Column(name = "invite_email", length = 100)
-    private String inviteEmail;
-
     @Enumerated(EnumType.STRING)
     @Column(name = "role", nullable = false, length = 20)
     private SpaceRole role;

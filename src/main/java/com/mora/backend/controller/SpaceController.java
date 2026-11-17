@@ -48,6 +48,16 @@ public class SpaceController {
         );
     }
 
+    @GetMapping("/dashboard")
+    @Operation(summary = "Lấy dữ liệu tiếp tục học, tài liệu đang xử lý và lời mời dành cho tôi")
+    public ResponseEntity<ApiResponse<DashboardResponse>> getDashboard() {
+        DashboardResponse response = spaceService.getDashboard();
+        return ResponseEntity.ok(ApiResponse.<DashboardResponse>builder()
+                .message("Lấy dữ liệu dashboard thành công")
+                .result(response)
+                .build());
+    }
+
     @GetMapping("/{id}")
     @Operation(summary = "Lấy thông tin chi tiết một Không gian học tập kèm tài liệu và thành viên")
     public ResponseEntity<ApiResponse<SpaceDetailResponse>> getSpaceById(@PathVariable("id") Long id) {

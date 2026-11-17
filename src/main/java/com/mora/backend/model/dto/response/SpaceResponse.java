@@ -18,6 +18,7 @@ public class SpaceResponse {
     private String description;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+    private LocalDateTime lastActivityAt;
     private SpaceRole currentUserRole;
     private int memberCount;
     private int documentCount;

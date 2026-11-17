@@ -13,6 +13,7 @@ import java.util.List;
 public interface SpaceService {
     SpaceResponse createSpace(SpaceCreateRequest request);
     List<SpaceResponse> getAllSpaces();
+    DashboardResponse getDashboard();
     SpaceDetailResponse getSpaceById(Long id);
     void deleteSpace(Long id);
 

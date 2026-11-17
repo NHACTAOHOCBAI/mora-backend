@@ -18,7 +18,6 @@ public class SpaceInvitationResponse {
     private Long spaceId;
     private String spaceName;
     private String inviteCode;
-    private String inviteEmail;
     private SpaceRole role;
     private InvitationStatus status;
     private LocalDateTime expiresAt;

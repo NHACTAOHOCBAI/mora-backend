@@ -36,6 +36,9 @@ public class Space {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
+    @Column(name = "last_activity_at")
+    private LocalDateTime lastActivityAt;
+
     @Column(name = "chat_summary", columnDefinition = "TEXT")
     private String chatSummary;
 
