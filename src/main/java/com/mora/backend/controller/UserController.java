@@ -2,6 +2,7 @@ package com.mora.backend.controller;
 
 import com.mora.backend.model.dto.request.UpdateProfileRequest;
 import com.mora.backend.model.dto.request.ChangePasswordRequest;
+import com.mora.backend.model.dto.request.LegalAcceptanceRequest;
 import com.mora.backend.model.dto.response.ApiResponse;
 import com.mora.backend.model.dto.response.UserResponse;
 import com.mora.backend.service.UserService;
@@ -30,6 +31,17 @@ public class UserController {
         return ResponseEntity.ok(
                 ApiResponse.<UserResponse>builder()
                         .message("Lấy thông tin cá nhân thành công")
+                        .result(response)
+                        .build()
+        );
+    }
+
+    @PostMapping("/legal-acceptance")
+    public ResponseEntity<ApiResponse<UserResponse>> acceptLegalDocuments(@Valid @RequestBody LegalAcceptanceRequest request) {
+        UserResponse response = userService.acceptLegalDocuments(request);
+        return ResponseEntity.ok(
+                ApiResponse.<UserResponse>builder()
+                        .message("Đã ghi nhận chấp thuận văn bản pháp lý")
                         .result(response)
                         .build()
         );

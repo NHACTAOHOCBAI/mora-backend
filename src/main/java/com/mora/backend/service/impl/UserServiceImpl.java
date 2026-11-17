@@ -7,6 +7,7 @@ import com.mora.backend.model.dto.request.LoginRequest;
 import com.mora.backend.model.dto.request.RegisterRequest;
 import com.mora.backend.model.dto.request.UpdateProfileRequest;
 import com.mora.backend.model.dto.request.ChangePasswordRequest;
+import com.mora.backend.model.dto.request.LegalAcceptanceRequest;
 import com.mora.backend.model.dto.response.AuthResponse;
 import com.mora.backend.model.dto.response.UserResponse;
 import com.mora.backend.model.dto.response.PageResponse;
@@ -17,6 +18,7 @@ import org.springframework.data.domain.Sort;
 import com.mora.backend.model.entity.Role;
 import com.mora.backend.model.entity.User;
 import com.mora.backend.model.entity.Space;
+import com.mora.backend.core.LegalPolicy;
 import com.mora.backend.repository.UserRepository;
 import com.mora.backend.repository.SpaceRepository;
 import com.mora.backend.security.JwtTokenProvider;
@@ -35,6 +37,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
+import java.time.LocalDateTime;
 import java.util.stream.Collectors;
 
 @Service
@@ -65,6 +68,8 @@ public class UserServiceImpl implements UserService {
                 .role(Role.ROLE_USER)
                 .active(true)
                 .build();
+
+        applyCurrentLegalAcceptance(user);
 
         user = userRepository.save(user);
 
@@ -237,6 +242,14 @@ public class UserServiceImpl implements UserService {
 
     @Override
     @Transactional
+    public UserResponse acceptLegalDocuments(LegalAcceptanceRequest request) {
+        User user = getCurrentUser();
+        applyCurrentLegalAcceptance(user);
+        return mapToUserResponse(userRepository.save(user));
+    }
+
+    @Override
+    @Transactional
     public void changePassword(ChangePasswordRequest request) {
         log.info("Changing password for current user");
         User user = getCurrentUser();
@@ -275,6 +288,26 @@ public class UserServiceImpl implements UserService {
                 .active(user.isActive())
                 .createdAt(user.getCreatedAt())
                 .updatedAt(user.getUpdatedAt())
+                .termsAcceptedVersion(user.getTermsAcceptedVersion())
+                .termsAcceptedAt(user.getTermsAcceptedAt())
+                .privacyAcceptedVersion(user.getPrivacyAcceptedVersion())
+                .privacyAcceptedAt(user.getPrivacyAcceptedAt())
+                .legalAcceptanceRequired(requiresLegalAcceptance(user))
                 .build();
+    }
+
+    private void applyCurrentLegalAcceptance(User user) {
+        LocalDateTime acceptedAt = LocalDateTime.now();
+        user.setTermsAcceptedVersion(LegalPolicy.TERMS_VERSION);
+        user.setTermsAcceptedAt(acceptedAt);
+        user.setPrivacyAcceptedVersion(LegalPolicy.PRIVACY_VERSION);
+        user.setPrivacyAcceptedAt(acceptedAt);
+    }
+
+    private boolean requiresLegalAcceptance(User user) {
+        return !LegalPolicy.TERMS_VERSION.equals(user.getTermsAcceptedVersion())
+                || !LegalPolicy.PRIVACY_VERSION.equals(user.getPrivacyAcceptedVersion())
+                || user.getTermsAcceptedAt() == null
+                || user.getPrivacyAcceptedAt() == null;
     }
 }

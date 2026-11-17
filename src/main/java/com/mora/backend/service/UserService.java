@@ -5,6 +5,7 @@ import com.mora.backend.model.dto.request.LoginRequest;
 import com.mora.backend.model.dto.request.RegisterRequest;
 import com.mora.backend.model.dto.request.UpdateProfileRequest;
 import com.mora.backend.model.dto.request.ChangePasswordRequest;
+import com.mora.backend.model.dto.request.LegalAcceptanceRequest;
 import com.mora.backend.model.dto.response.AuthResponse;
 import com.mora.backend.model.dto.response.UserResponse;
 import com.mora.backend.model.dto.response.PageResponse;
@@ -25,4 +26,5 @@ public interface UserService {
     UserResponse updateAvatar(MultipartFile file);
     void changePassword(ChangePasswordRequest request);
     AuthResponse impersonateUser(Long id);
+    UserResponse acceptLegalDocuments(LegalAcceptanceRequest request);
 }

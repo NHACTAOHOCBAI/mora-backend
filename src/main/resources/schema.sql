@@ -115,3 +115,9 @@ ALTER TABLE users DROP COLUMN IF EXISTS username;
 
 -- Preserve existing sessions until an account actually resets its password.
 ALTER TABLE users ADD COLUMN IF NOT EXISTS credential_version BIGINT NOT NULL DEFAULT 0;
+
+-- Legal consent for the published Terms of Use and Privacy Policy.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS terms_accepted_version VARCHAR(20);
+ALTER TABLE users ADD COLUMN IF NOT EXISTS terms_accepted_at TIMESTAMP;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS privacy_accepted_version VARCHAR(20);
+ALTER TABLE users ADD COLUMN IF NOT EXISTS privacy_accepted_at TIMESTAMP;

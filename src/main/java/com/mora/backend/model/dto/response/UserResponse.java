@@ -21,4 +21,9 @@ public class UserResponse {
     private boolean active;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+    private String termsAcceptedVersion;
+    private LocalDateTime termsAcceptedAt;
+    private String privacyAcceptedVersion;
+    private LocalDateTime privacyAcceptedAt;
+    private boolean legalAcceptanceRequired;
 }

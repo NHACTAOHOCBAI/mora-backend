@@ -10,6 +10,7 @@ import com.mora.backend.model.entity.Role;
 import com.mora.backend.model.entity.User;
 import com.mora.backend.repository.UserRepository;
 import com.mora.backend.security.JwtTokenProvider;
+import com.mora.backend.core.LegalPolicy;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -66,6 +67,8 @@ class UserServiceImplTest {
         registerRequest.setPassword("password123");
         registerRequest.setEmail("testuser@example.com");
         registerRequest.setFullName("Test User");
+        registerRequest.setAcceptsTerms(true);
+        registerRequest.setAcceptsPrivacy(true);
 
         loginRequest = new LoginRequest();
         loginRequest.setEmail("testuser@example.com");
@@ -76,12 +79,15 @@ class UserServiceImplTest {
     void register_Success() {
         when(userRepository.existsByEmail(registerRequest.getEmail())).thenReturn(false);
         when(passwordEncoder.encode(registerRequest.getPassword())).thenReturn("encoded_password");
-        when(userRepository.save(any(User.class))).thenReturn(user);
+        when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         UserResponse response = userService.register(registerRequest);
 
         assertNotNull(response);
         assertEquals(user.getEmail(), response.getEmail());
+        assertEquals(LegalPolicy.TERMS_VERSION, response.getTermsAcceptedVersion());
+        assertEquals(LegalPolicy.PRIVACY_VERSION, response.getPrivacyAcceptedVersion());
+        assertFalse(response.isLegalAcceptanceRequired());
         verify(userRepository, times(1)).save(any(User.class));
     }
 

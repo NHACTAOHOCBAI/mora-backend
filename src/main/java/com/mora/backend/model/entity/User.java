@@ -51,6 +51,18 @@ public class User {
     @org.hibernate.annotations.ColumnDefault("0")
     private long credentialVersion;
 
+    @Column(name = "terms_accepted_version", length = 20)
+    private String termsAcceptedVersion;
+
+    @Column(name = "terms_accepted_at")
+    private LocalDateTime termsAcceptedAt;
+
+    @Column(name = "privacy_accepted_version", length = 20)
+    private String privacyAcceptedVersion;
+
+    @Column(name = "privacy_accepted_at")
+    private LocalDateTime privacyAcceptedAt;
+
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
