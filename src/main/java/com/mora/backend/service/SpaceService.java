@@ -4,6 +4,8 @@ import com.mora.backend.model.dto.request.SpaceCreateRequest;
 import com.mora.backend.model.dto.request.SpaceInvitationCreateRequest;
 import com.mora.backend.model.dto.request.SpaceMemberAddRequest;
 import com.mora.backend.model.dto.request.SpaceMemberRoleUpdateRequest;
+import com.mora.backend.model.dto.request.SpaceUpdateRequest;
+import com.mora.backend.model.dto.request.SpaceLeaveRequest;
 import com.mora.backend.model.dto.response.*;
 import com.mora.backend.model.entity.SpaceRole;
 import com.mora.backend.model.entity.User;
@@ -15,7 +17,9 @@ public interface SpaceService {
     List<SpaceResponse> getAllSpaces();
     DashboardResponse getDashboard();
     SpaceDetailResponse getSpaceById(Long id);
+    SpaceResponse updateSpace(Long id, SpaceUpdateRequest request);
     void deleteSpace(Long id);
+    void leaveSpace(Long id, SpaceLeaveRequest request);
 
     // RBAC & Member Management
     List<SpaceMemberResponse> getSpaceMembers(Long spaceId);

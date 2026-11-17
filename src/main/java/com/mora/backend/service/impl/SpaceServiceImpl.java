@@ -6,6 +6,8 @@ import com.mora.backend.model.dto.request.SpaceCreateRequest;
 import com.mora.backend.model.dto.request.SpaceInvitationCreateRequest;
 import com.mora.backend.model.dto.request.SpaceMemberAddRequest;
 import com.mora.backend.model.dto.request.SpaceMemberRoleUpdateRequest;
+import com.mora.backend.model.dto.request.SpaceUpdateRequest;
+import com.mora.backend.model.dto.request.SpaceLeaveRequest;
 import com.mora.backend.model.dto.response.*;
 import com.mora.backend.model.entity.*;
 import com.mora.backend.repository.*;
@@ -180,6 +182,23 @@ public class SpaceServiceImpl implements SpaceService {
 
     @Override
     @Transactional
+    public SpaceResponse updateSpace(Long id, SpaceUpdateRequest request) {
+        User currentUser = userService.getCurrentUser();
+        Space space = spaceRepository.findForUpdate(id)
+                .orElseThrow(() -> new AppException(ErrorCode.SPACE_NOT_FOUND));
+        SpaceRole userRole = getUserRoleInSpace(id, currentUser);
+        if (currentUser.getRole() != Role.ROLE_ADMIN && userRole != SpaceRole.OWNER) {
+            throw new AppException(ErrorCode.SPACE_ACCESS_DENIED);
+        }
+        space.setName(request.getName().trim());
+        space.setDescription(request.getDescription() == null ? null : request.getDescription().trim());
+        Space updated = spaceRepository.save(space);
+        return convertToSpaceResponse(updated, getUserRoleInSpace(id, currentUser),
+                spaceMemberRepository.findBySpaceId(id).size(), documentRepository.findBySpaceId(id).size());
+    }
+
+    @Override
+    @Transactional
     public void deleteSpace(Long id) {
         User currentUser = userService.getCurrentUser();
         Space space = spaceRepository.findForUpdate(id)
@@ -212,6 +231,34 @@ public class SpaceServiceImpl implements SpaceService {
         // 5. Delete the space itself
         spaceRepository.delete(space);
         log.info("Space {} successfully deleted by user {}", id, currentUser.getEmail());
+    }
+
+    @Override
+    @Transactional
+    public void leaveSpace(Long id, SpaceLeaveRequest request) {
+        User currentUser = userService.getCurrentUser();
+        Space space = spaceRepository.findForUpdate(id)
+                .orElseThrow(() -> new AppException(ErrorCode.SPACE_NOT_FOUND));
+
+        SpaceMember currentMember = spaceMemberRepository.findBySpaceIdAndUserId(id, currentUser.getId())
+                .orElseThrow(() -> new AppException(ErrorCode.SPACE_MEMBER_NOT_FOUND));
+        boolean isDirectOwner = space.getUser() != null && space.getUser().getId().equals(currentUser.getId());
+
+        if (isDirectOwner) {
+            Long successorId = request.getSuccessorUserId();
+            if (successorId == null || successorId.equals(currentUser.getId())) {
+                throw new AppException(ErrorCode.INVALID_REQUEST_PARAMETER);
+            }
+            SpaceMember successor = spaceMemberRepository.findBySpaceIdAndUserId(id, successorId)
+                    .orElseThrow(() -> new AppException(ErrorCode.SPACE_MEMBER_NOT_FOUND));
+            successor.setRole(SpaceRole.OWNER);
+            spaceMemberRepository.save(successor);
+            space.setUser(successor.getUser());
+            spaceRepository.save(space);
+        }
+
+        spaceMemberRepository.delete(currentMember);
+        log.info("User {} left space {}", currentUser.getId(), id);
     }
 
     @Override

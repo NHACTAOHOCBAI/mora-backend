@@ -4,6 +4,8 @@ import com.mora.backend.model.dto.request.SpaceCreateRequest;
 import com.mora.backend.model.dto.request.SpaceInvitationCreateRequest;
 import com.mora.backend.model.dto.request.SpaceMemberAddRequest;
 import com.mora.backend.model.dto.request.SpaceMemberRoleUpdateRequest;
+import com.mora.backend.model.dto.request.SpaceUpdateRequest;
+import com.mora.backend.model.dto.request.SpaceLeaveRequest;
 import com.mora.backend.model.dto.response.*;
 import com.mora.backend.service.SpaceService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -70,6 +72,17 @@ public class SpaceController {
         );
     }
 
+    @PatchMapping("/{id}")
+    @Operation(summary = "Cập nhật tên và mô tả Không gian (Chỉ OWNER hoặc ADMIN)")
+    public ResponseEntity<ApiResponse<SpaceResponse>> updateSpace(
+            @PathVariable("id") Long id,
+            @Valid @RequestBody SpaceUpdateRequest request) {
+        return ResponseEntity.ok(ApiResponse.<SpaceResponse>builder()
+                .message("Cập nhật Không gian học tập thành công")
+                .result(spaceService.updateSpace(id, request))
+                .build());
+    }
+
     @DeleteMapping("/{id}")
     @Operation(summary = "Xóa một Không gian học tập (Chỉ OWNER hoặc ADMIN)")
     public ResponseEntity<ApiResponse<Void>> deleteSpace(@PathVariable("id") Long id) {
@@ -79,6 +92,17 @@ public class SpaceController {
                         .message("Xóa Không gian học tập thành công")
                         .build()
         );
+    }
+
+    @PostMapping("/{id}/leave")
+    @Operation(summary = "Rời Không gian; OWNER phải chọn người kế nhiệm")
+    public ResponseEntity<ApiResponse<Void>> leaveSpace(
+            @PathVariable("id") Long id,
+            @RequestBody(required = false) SpaceLeaveRequest request) {
+        spaceService.leaveSpace(id, request == null ? new SpaceLeaveRequest() : request);
+        return ResponseEntity.ok(ApiResponse.<Void>builder()
+                .message("Đã rời Không gian học tập")
+                .build());
     }
 
     // ==========================================
