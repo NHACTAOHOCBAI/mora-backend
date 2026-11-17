@@ -19,7 +19,11 @@ public interface SpaceService {
 
     // RBAC & Member Management
     List<SpaceMemberResponse> getSpaceMembers(Long spaceId);
-    SpaceMemberResponse addSpaceMember(Long spaceId, SpaceMemberAddRequest request);
+    SpaceMemberInvitationResponse inviteSpaceMember(Long spaceId, SpaceMemberAddRequest request);
+    List<SpaceMemberInvitationResponse> getMemberInvitations(Long spaceId);
+    SpaceMemberInvitationResponse acceptMemberInvitation(Long invitationId);
+    SpaceMemberInvitationResponse declineMemberInvitation(Long invitationId);
+    void revokeMemberInvitation(Long spaceId, Long invitationId);
     SpaceMemberResponse updateMemberRole(Long spaceId, Long userId, SpaceMemberRoleUpdateRequest request);
     void removeSpaceMember(Long spaceId, Long userId);
     SpaceRole getUserRoleInSpace(Long spaceId, User user);

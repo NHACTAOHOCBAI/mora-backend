@@ -97,19 +97,22 @@ public class SpaceController {
         );
     }
 
-    @PostMapping("/{id}/members")
-    @Operation(summary = "Thêm thành viên vào Không gian học tập bằng email (Chỉ OWNER)")
-    public ResponseEntity<ApiResponse<SpaceMemberResponse>> addSpaceMember(
+    @PostMapping("/{id}/member-invitations")
+    @Operation(summary = "Gửi lời mời thành viên theo email (Chỉ OWNER)")
+    public ResponseEntity<ApiResponse<SpaceMemberInvitationResponse>> inviteSpaceMember(
             @PathVariable("id") Long id,
             @Valid @RequestBody SpaceMemberAddRequest request) {
-        SpaceMemberResponse response = spaceService.addSpaceMember(id, request);
+        SpaceMemberInvitationResponse response = spaceService.inviteSpaceMember(id, request);
         return ResponseEntity.status(HttpStatus.CREATED).body(
-                ApiResponse.<SpaceMemberResponse>builder()
-                        .message("Thêm thành viên vào nhóm thành công")
+                ApiResponse.<SpaceMemberInvitationResponse>builder()
+                        .message("Đã gửi lời mời thành viên")
                         .result(response)
                         .build()
         );
     }
+
+    @GetMapping("/{id}/member-invitations") public ResponseEntity<ApiResponse<List<SpaceMemberInvitationResponse>>> getMemberInvitations(@PathVariable("id") Long id) { return ResponseEntity.ok(ApiResponse.<List<SpaceMemberInvitationResponse>>builder().result(spaceService.getMemberInvitations(id)).build()); }
+    @DeleteMapping("/{id}/member-invitations/{invitationId}") public ResponseEntity<ApiResponse<Void>> revokeMemberInvitation(@PathVariable("id") Long id, @PathVariable Long invitationId) { spaceService.revokeMemberInvitation(id, invitationId); return ResponseEntity.ok(ApiResponse.<Void>builder().build()); }
 
     @PatchMapping("/{id}/members/{userId}")
     @Operation(summary = "Cập nhật vai trò thành viên trong Không gian (Chỉ OWNER)")

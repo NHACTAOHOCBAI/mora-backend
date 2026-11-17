@@ -16,6 +16,8 @@ import java.util.List;
 public class DashboardResponse {
     private List<SpaceResponse> recentSpaces;
     private List<ProcessingDocument> processingDocuments;
+    private List<SpaceMemberInvitationResponse> pendingMemberInvitations;
+    private int pendingMemberInvitationCount;
 
     @Data
     @Builder

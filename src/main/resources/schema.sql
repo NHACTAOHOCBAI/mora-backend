@@ -43,6 +43,17 @@ CREATE TABLE IF NOT EXISTS space_invitations (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE IF NOT EXISTS space_member_invitations (
+    id BIGSERIAL PRIMARY KEY,
+    space_id BIGINT NOT NULL REFERENCES spaces(id) ON DELETE CASCADE,
+    inviter_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    invitee_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    role VARCHAR(20) NOT NULL DEFAULT 'EDITOR',
+    status VARCHAR(20) NOT NULL DEFAULT 'PENDING',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_member_invites_invitee_status ON space_member_invitations (invitee_id, status);
+
 -- Compatibility migration: earlier local schemas required an invitee for every
 -- invitation. Shareable invitation links intentionally do not have one.
 ALTER TABLE space_invitations ALTER COLUMN invitee_id DROP NOT NULL;

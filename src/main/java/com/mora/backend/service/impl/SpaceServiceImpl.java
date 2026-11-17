@@ -31,6 +31,7 @@ public class SpaceServiceImpl implements SpaceService {
     private final SpaceRepository spaceRepository;
     private final SpaceMemberRepository spaceMemberRepository;
     private final SpaceInvitationRepository spaceInvitationRepository;
+    private final SpaceMemberInvitationRepository spaceMemberInvitationRepository;
     private final ChatMessageRepository chatMessageRepository;
     private final UserService userService;
     private final UserRepository userRepository;
@@ -111,10 +112,15 @@ public class SpaceServiceImpl implements SpaceService {
                         .spaceId(document.getSpace().getId()).spaceName(document.getSpace().getName())
                         .updatedAt(document.getUpdatedAt()).build())
                 .toList();
+        List<SpaceMemberInvitationResponse> pending = spaceMemberInvitationRepository
+                .findByInviteeIdAndStatusOrderByCreatedAtDesc(currentUser.getId(), InvitationStatus.PENDING).stream()
+                .map(this::convertToMemberInvitationResponse).toList();
 
         return DashboardResponse.builder()
                 .recentSpaces(recentSpaces)
                 .processingDocuments(processingDocuments)
+                .pendingMemberInvitations(pending.stream().limit(5).toList())
+                .pendingMemberInvitationCount(pending.size())
                 .build();
     }
 
@@ -189,6 +195,7 @@ public class SpaceServiceImpl implements SpaceService {
 
         // 1. Delete invitations
         spaceInvitationRepository.deleteBySpaceId(id);
+        spaceMemberInvitationRepository.deleteBySpaceId(id);
 
         // 2. Delete space members
         spaceMemberRepository.deleteBySpaceId(id);
@@ -222,7 +229,7 @@ public class SpaceServiceImpl implements SpaceService {
 
     @Override
     @Transactional
-    public SpaceMemberResponse addSpaceMember(Long spaceId, SpaceMemberAddRequest request) {
+    public SpaceMemberInvitationResponse inviteSpaceMember(Long spaceId, SpaceMemberAddRequest request) {
         User currentUser = userService.getCurrentUser();
         Space space = spaceRepository.findById(spaceId)
                 .orElseThrow(() -> new AppException(ErrorCode.SPACE_NOT_FOUND));
@@ -239,16 +246,51 @@ public class SpaceServiceImpl implements SpaceService {
         if (spaceMemberRepository.existsBySpaceIdAndUserId(spaceId, targetUser.getId())) {
             throw new AppException(ErrorCode.SPACE_MEMBER_ALREADY_EXISTS);
         }
+        if (spaceMemberInvitationRepository.existsBySpaceIdAndInviteeIdAndStatus(spaceId, targetUser.getId(), InvitationStatus.PENDING)) {
+            throw new AppException(ErrorCode.INVALID_REQUEST_PARAMETER);
+        }
 
-        SpaceMember member = SpaceMember.builder()
-                .space(space)
-                .user(targetUser)
+        SpaceMemberInvitation invitation = SpaceMemberInvitation.builder()
+                .space(space).inviter(currentUser).invitee(targetUser)
                 .role(request.getRole() != null ? request.getRole() : SpaceRole.EDITOR)
                 .build();
-        member = spaceMemberRepository.save(member);
+        invitation = spaceMemberInvitationRepository.save(invitation);
+        return convertToMemberInvitationResponse(invitation);
+    }
 
-        log.info("Added user {} to space {} as {}", targetUser.getEmail(), spaceId, member.getRole());
-        return convertToMemberResponse(member);
+    @Override @Transactional(readOnly = true)
+    public List<SpaceMemberInvitationResponse> getMemberInvitations(Long spaceId) {
+        User user = userService.getCurrentUser();
+        if (user.getRole() != Role.ROLE_ADMIN && getUserRoleInSpace(spaceId, user) != SpaceRole.OWNER) throw new AppException(ErrorCode.SPACE_ACCESS_DENIED);
+        return spaceMemberInvitationRepository.findBySpaceIdOrderByCreatedAtDesc(spaceId).stream().map(this::convertToMemberInvitationResponse).toList();
+    }
+
+    @Override @Transactional
+    public SpaceMemberInvitationResponse acceptMemberInvitation(Long invitationId) {
+        SpaceMemberInvitation invitation = requireInviteeInvitation(invitationId);
+        if (invitation.getStatus() != InvitationStatus.PENDING) throw new AppException(ErrorCode.INVALID_REQUEST_PARAMETER);
+        if (!spaceMemberRepository.existsBySpaceIdAndUserId(invitation.getSpace().getId(), invitation.getInvitee().getId())) {
+            spaceMemberRepository.save(SpaceMember.builder().space(invitation.getSpace()).user(invitation.getInvitee()).role(invitation.getRole()).build());
+        }
+        invitation.setStatus(InvitationStatus.ACCEPTED);
+        return convertToMemberInvitationResponse(spaceMemberInvitationRepository.save(invitation));
+    }
+
+    @Override @Transactional
+    public SpaceMemberInvitationResponse declineMemberInvitation(Long invitationId) {
+        SpaceMemberInvitation invitation = requireInviteeInvitation(invitationId);
+        if (invitation.getStatus() != InvitationStatus.PENDING) throw new AppException(ErrorCode.INVALID_REQUEST_PARAMETER);
+        invitation.setStatus(InvitationStatus.DECLINED);
+        return convertToMemberInvitationResponse(spaceMemberInvitationRepository.save(invitation));
+    }
+
+    @Override @Transactional
+    public void revokeMemberInvitation(Long spaceId, Long invitationId) {
+        User user = userService.getCurrentUser();
+        if (user.getRole() != Role.ROLE_ADMIN && getUserRoleInSpace(spaceId, user) != SpaceRole.OWNER) throw new AppException(ErrorCode.SPACE_ACCESS_DENIED);
+        SpaceMemberInvitation invitation = spaceMemberInvitationRepository.findById(invitationId).orElseThrow(() -> new AppException(ErrorCode.INVITATION_NOT_FOUND));
+        if (!invitation.getSpace().getId().equals(spaceId)) throw new AppException(ErrorCode.INVITATION_NOT_FOUND);
+        invitation.setStatus(InvitationStatus.REVOKED); spaceMemberInvitationRepository.save(invitation);
     }
 
     @Override
@@ -525,5 +567,20 @@ public class SpaceServiceImpl implements SpaceService {
                 .createdAt(inv.getCreatedAt())
                 .inviterName(inviterName)
                 .build();
+    }
+
+    private SpaceMemberInvitation requireInviteeInvitation(Long id) {
+        User currentUser = userService.getCurrentUser();
+        SpaceMemberInvitation invitation = spaceMemberInvitationRepository.findById(id)
+                .orElseThrow(() -> new AppException(ErrorCode.INVITATION_NOT_FOUND));
+        if (!invitation.getInvitee().getId().equals(currentUser.getId())) throw new AppException(ErrorCode.SPACE_ACCESS_DENIED);
+        return invitation;
+    }
+
+    private SpaceMemberInvitationResponse convertToMemberInvitationResponse(SpaceMemberInvitation invitation) {
+        return SpaceMemberInvitationResponse.builder().id(invitation.getId())
+                .spaceId(invitation.getSpace().getId()).spaceName(invitation.getSpace().getName())
+                .inviterName(invitation.getInviter().displayName()).inviteeEmail(invitation.getInvitee().getEmail())
+                .role(invitation.getRole()).status(invitation.getStatus()).createdAt(invitation.getCreatedAt()).build();
     }
 }
