@@ -187,8 +187,6 @@ public class ChatServiceImpl implements ChatService {
                 .messageType(MessageType.AI_RESPONSE)
                 .text(pythonResponse.answer)
                 .space(space)
-                .condensedQuestion(pythonResponse.condensedQuestion)
-                .promptSent(pythonResponse.promptSent)
                 .citations(citationsJson)
                 .selectedDocumentIds(docIdsJson)
                 .build();
@@ -244,8 +242,6 @@ public class ChatServiceImpl implements ChatService {
                 .answerFound(true)
                 .answer(pythonResponse.answer)
                 .citations(responseCitations)
-                .condensedQuestion(pythonResponse.condensedQuestion)
-                .promptSent(pythonResponse.promptSent)
                 .build();
     }
 

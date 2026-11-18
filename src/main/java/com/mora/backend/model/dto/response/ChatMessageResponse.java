@@ -22,8 +22,6 @@ public class ChatMessageResponse {
     private String fullName;
     private String userAvatar;
     private LocalDateTime timestamp;
-    private String condensedQuestion;
-    private String promptSent;
     private List<SpaceChatResponse.SpaceCitation> citations;
     private List<Long> selectedDocumentIds;
 }

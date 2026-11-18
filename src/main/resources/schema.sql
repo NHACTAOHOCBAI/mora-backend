@@ -146,3 +146,7 @@ CREATE INDEX IF NOT EXISTS idx_spaces_last_activity_at ON spaces (last_activity_
 -- Invitation links are shareable. Named recipients are managed by direct member addition.
 DROP INDEX IF EXISTS idx_space_invitations_recipient_pending;
 ALTER TABLE space_invitations DROP COLUMN IF EXISTS invite_email;
+
+-- Debug-only AI prompt data must never persist or be exposed to users.
+ALTER TABLE chat_messages DROP COLUMN IF EXISTS condensed_question;
+ALTER TABLE chat_messages DROP COLUMN IF EXISTS prompt_sent;

@@ -35,12 +35,6 @@ public class ChatMessage {
     @JoinColumn(name = "document_id")
     private Document document;
 
-    @Column(name = "condensed_question", columnDefinition = "TEXT")
-    private String condensedQuestion;
-
-    @Column(name = "prompt_sent", columnDefinition = "TEXT")
-    private String promptSent;
-
     @Column(name = "citations", columnDefinition = "TEXT")
     private String citations; // JSON string chứa danh sách Citation
 

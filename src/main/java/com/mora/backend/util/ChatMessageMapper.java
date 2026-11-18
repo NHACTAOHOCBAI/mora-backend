@@ -58,8 +58,6 @@ public final class ChatMessageMapper {
                 .fullName(fullName)
                 .userAvatar(userAvatar)
                 .timestamp(msg.getCreatedAt())
-                .condensedQuestion(msg.getCondensedQuestion())
-                .promptSent(msg.getPromptSent())
                 .citations(responseCitations)
                 .selectedDocumentIds(selectedDocIds)
                 .build();

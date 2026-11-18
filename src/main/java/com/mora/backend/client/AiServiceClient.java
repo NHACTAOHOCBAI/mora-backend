@@ -57,8 +57,6 @@ public class AiServiceClient {
     public static class PythonChatResponse {
         public String answer;
         public List<Citation> citations;
-        public String condensedQuestion;
-        public String promptSent;
 
         public static class Citation {
             public int pageNumber;

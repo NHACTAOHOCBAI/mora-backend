@@ -16,8 +16,6 @@ public class AnswerVerifiedEvent {
     private Long assistantMessageId;
     private String answer;
     private List<Citation> citations;
-    private String condensedQuestion;
-    private String promptSent;
 
     @Data
     @Builder
