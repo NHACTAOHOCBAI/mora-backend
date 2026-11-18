@@ -17,6 +17,15 @@ flowchart LR
 
 Khi người dùng tải tài liệu, Backend lưu metadata và tệp, sau đó xử lý bất đồng bộ: gọi AI Service để phân tích PDF, chunk/index nội dung vào Qdrant. Khi chat, Backend xác thực người dùng, chuyển yêu cầu phù hợp tới AI Service và phát các sự kiện space qua WebSocket.
 
+## Khả năng chính
+
+- Xác thực email/mật khẩu bằng JWT, hồ sơ, avatar, đổi/khôi phục mật khẩu và chấp nhận văn bản pháp lý.
+- Tạo, quản lý và tham gia Space; quản lý thành viên, lời mời và phân quyền OWNER/MEMBER.
+- Tải/xóa PDF, lưu metadata và điều phối parse/index qua AI Service.
+- Chat nhóm và hỏi AI trong Space; lịch sử, citation, ghim tin nhắn và typing indicator qua STOMP.
+- Tạo, lấy, chấm điểm và xóa bộ ôn tập/quiz theo Space.
+- Trung tâm quản trị cho Admin: dashboard vận hành, người dùng, Space và tài liệu.
+
 ## Công nghệ và thành phần
 
 - Java 26, Spring Boot 4, Maven Wrapper.
@@ -35,6 +44,19 @@ src/main/java/com/mora/backend/
 ├── client/      # HTTP client gọi AI Service
 └── exception/   # Lỗi nghiệp vụ và error handler
 ```
+
+## Nhóm API
+
+API có prefix `/api`. Schema tương tác có tại `http://localhost:8080/swagger-ui.html`; OpenAPI JSON tại `http://localhost:8080/api-docs`.
+
+| Nhóm | Ví dụ endpoint |
+| --- | --- |
+| Auth & tài khoản | `/api/auth/*`, `/api/users/me`, `/api/users/profile` |
+| Space & lời mời | `/api/spaces`, `/api/spaces/{id}/members`, `/api/spaces/join/{inviteCode}` |
+| Tài liệu | `/api/documents/upload`, `/api/documents/space/{spaceId}` |
+| Chat & pin | `/api/chat/space`, `/api/chat/space/message`, `/api/chat/space/{spaceId}/pins` |
+| Ôn tập | `/api/spaces/{spaceId}/study-sets`, `/api/study-sets/{id}/quiz/grade` |
+| Admin | `/api/admin/dashboard`, `/api/admin/users`, `/api/admin/spaces`, `/api/admin/documents` |
 
 
 ## Điều phối chatbot
@@ -94,6 +116,8 @@ DB_PASSWORD=postgres
 
 Các biến tùy chọn gồm `PORT` (mặc định `8080`), `AI_SERVICE_URL` (mặc định `http://localhost:8000`) và cấu hình R2: `R2_ENDPOINT`, `R2_ACCESS_KEY`, `R2_SECRET_KEY`, `R2_BUCKET`, `R2_PUBLIC_URL`. Không commit `.env`.
 
+Các nhóm cấu hình còn lại trong `.env.example` gồm `CORS_ALLOWED_ORIGINS`, `JWT_SECRET`, `JWT_EXPIRATION_MS`, seed admin local (`MORA_ADMIN_*`) và SMTP/khôi phục mật khẩu (`PASSWORD_RECOVERY_*`, `MAIL_*`). `JWT_SECRET` phải dài tối thiểu 32 byte.
+
 ## Chạy local
 
 1. Khởi động PostgreSQL và Qdrant:
@@ -113,7 +137,7 @@ Các biến tùy chọn gồm `PORT` (mặc định `8080`), `AI_SERVICE_URL` (m
    ./mvnw spring-boot:run
    ```
 
-Backend sẽ lắng nghe tại `http://localhost:8080`. Schema SQL được khởi tạo tự động; Hibernate tiếp tục cập nhật schema theo cấu hình hiện tại.
+Backend sẽ lắng nghe tại `http://localhost:8080`. Schema SQL được khởi tạo tự động; Hibernate tiếp tục cập nhật schema theo cấu hình hiện tại. Swagger UI có tại `http://localhost:8080/swagger-ui.html`.
 
 Lệnh kiểm tra/build:
 
@@ -158,25 +182,20 @@ docker compose --env-file .env up --build
 
 Backend không lưu hoặc truyền key/model AI của người dùng. Không còn API `/api/user/ai-settings` và kiểm tra key. Các bảng cũ được giữ nhưng ngừng sử dụng; schema mới không tạo chúng.
 
+## Repository liên quan
 
-### Email-only accounts
+- [Mora Frontend](../mora-frontend/README.md): web client, landing page, Space và khu quản trị.
+- [Mora AI Service](../mora-ai/README.md): phân tích PDF, RAG, citation và ôn tập.
+- [Mora Infra](../mora-infra/README.md): chạy toàn bộ stack bằng Docker Compose.
 
-Login accepts `{ "email": "person@example.com", "password": "..." }`; registration
-accepts `email`, `fullName`, and `password`. Member addition accepts `email` and
-`role`. Account responses no longer contain an account handle; chat sender names
-use `fullName`, and member responses include `email`.
 
-JWT subjects are immutable user IDs with `tokenVersion: 2`. Existing sessions
-must sign in again. Admin seeding identifies accounts by `MORA_ADMIN_EMAIL`.
+### Tài khoản chỉ dùng email
 
-Before deploying, back up PostgreSQL and stop the old backend. Deploy frontend
-and backend together. Startup `schema.sql` removes the obsolete `users.username`
-column using `DROP COLUMN IF EXISTS` without CASCADE. User IDs, password hashes,
-roles and related records are preserved. Repeated startup is safe. Because SQL
-initialization currently continues on errors, verify the column was removed; if
-an external dependency blocks removal, resolve it explicitly before reopening
-traffic. Rolling back requires the backup, since discarded handles cannot be
-reconstructed. Do not run the application context test against a production DB.
+Đăng nhập nhận `{ "email": "person@example.com", "password": "..." }`; đăng ký nhận `email`, `fullName` và `password`. Thêm thành viên nhận `email` và `role`. Phản hồi tài khoản không còn account handle; chat hiển thị `fullName`, còn phản hồi thành viên có `email`.
+
+JWT subject là user ID bất biến với `tokenVersion: 2`, vì vậy phiên cũ cần đăng nhập lại. Seed Admin nhận diện tài khoản qua `MORA_ADMIN_EMAIL`.
+
+Trước khi triển khai từ schema cũ, hãy backup PostgreSQL và dừng Backend cũ; triển khai Frontend và Backend cùng lúc. `schema.sql` xóa cột `users.username` đã lỗi thời bằng `DROP COLUMN IF EXISTS` không kèm `CASCADE`. User ID, password hash, role và bản ghi liên quan được giữ lại; khởi động lặp lại an toàn. Vì SQL initialization tiếp tục khi có lỗi, cần xác nhận cột đã được xóa; nếu dependency ngoài chặn thao tác, xử lý rõ ràng trước khi mở lại traffic. Rollback cần bản backup vì handle đã xóa không thể khôi phục. Không chạy application context test vào database production.
 
 ## Khôi phục mật khẩu qua SMTP
 
