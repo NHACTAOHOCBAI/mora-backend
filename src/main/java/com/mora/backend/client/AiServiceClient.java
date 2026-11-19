@@ -51,6 +51,8 @@ public class AiServiceClient {
         public List<HistoryItem> history;
         @JsonProperty("chat_summary")
         public String chatSummary;
+        @JsonProperty("stream_id")
+        public String streamId;
 
         public static class ContextItem {
             public int pageNumber;
@@ -107,14 +109,14 @@ public class AiServiceClient {
                     }, response -> {
                         try (BufferedReader reader = new BufferedReader(new InputStreamReader(response.getBody(), StandardCharsets.UTF_8))) {
                             String line, event = "message", data = null;
-                            while (!cancelled.getAsBoolean() && (line = reader.readLine()) != null) {
+                            while ((line = reader.readLine()) != null) {
                                 if (line.startsWith("event:")) event = line.substring(6).trim();
                                 else if (line.startsWith("data:")) data = line.substring(5).trim();
                                 else if (line.isBlank() && data != null) {
                                     JsonNode payloadNode = mapper.readTree(data);
                                     if ("usage".equals(event)) {
                                         recordStreamUsage(payloadNode, mapper, payload);
-                                    } else {
+                                    } else if (!cancelled.getAsBoolean()) {
                                         consumer.accept(new StreamEvent(event, payloadNode));
                                     }
                                     event = "message"; data = null;
@@ -128,6 +130,16 @@ public class AiServiceClient {
                 log.error("Failed to stream Python AI service", e);
                 throw new AppException(ErrorCode.AI_ENGINE_ERROR);
             }
+        }
+    }
+
+    /** Tell the AI service to cancel its provider-side background response. */
+    public void cancelStream(String streamId) {
+        try {
+            restTemplate.delete(aiServiceUrl + "/api/chat/stream/{streamId}", streamId);
+        } catch (Exception error) {
+            // The response may already have completed before this request arrived.
+            log.warn("Could not request provider-side cancellation for stream {}", streamId);
         }
     }
 

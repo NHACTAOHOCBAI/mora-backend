@@ -295,17 +295,19 @@ public class ChatServiceImpl implements ChatService {
         messagingTemplate.convertAndSend("/topic/spaces/" + space.getId() + "/messages", mapToResponse(userMessage));
 
         AiServiceClient.PythonChatRequest python = new AiServiceClient.PythonChatRequest();
-        python.question = request.getQuestion(); python.spaceId = space.getId(); python.documentIds = documents.stream().map(Document::getId).toList();
+        python.question = request.getQuestion(); python.spaceId = space.getId(); python.documentIds = documents.stream().map(Document::getId).toList(); python.streamId = requestId;
         python.context = context; python.history = history; python.chatSummary = space.getChatSummary();
         SseEmitter emitter = new SseEmitter(0L);
         AtomicBoolean cancelled = activeStreams.get(key);
         AtomicLong sequence = new AtomicLong();
         emitter.onTimeout(() -> {
             cancelled.set(true);
+            CompletableFuture.runAsync(() -> aiServiceClient.cancelStream(requestId));
             activeStreams.remove(key);
         });
         emitter.onError(error -> {
             cancelled.set(true);
+            CompletableFuture.runAsync(() -> aiServiceClient.cancelStream(requestId));
             activeStreams.remove(key);
         });
         emitter.onCompletion(() -> activeStreams.remove(key));
@@ -322,6 +324,7 @@ public class ChatServiceImpl implements ChatService {
         if (currentUser.getRole() != Role.ROLE_ADMIN && getUserRole(space, currentUser) == null) throw new AppException(ErrorCode.UNAUTHORIZED);
         AtomicBoolean cancelled = activeStreams.get(streamKey(spaceId, requestId));
         if (cancelled != null) cancelled.set(true);
+        CompletableFuture.runAsync(() -> aiServiceClient.cancelStream(requestId));
     }
 
     private void runStream(Space space, AiServiceClient.PythonChatRequest python, SseEmitter emitter, String key,

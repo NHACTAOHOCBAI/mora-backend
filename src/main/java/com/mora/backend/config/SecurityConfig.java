@@ -55,6 +55,7 @@ public class SecurityConfig {
                                 "/v3/api-docs/**",
                                 "/ws/**",
                                 "/api/hello",
+                                "/api/internal/ai-settings/runtime",
                                 "/actuator/health/liveness",
                                 "/error"
                         ).permitAll()

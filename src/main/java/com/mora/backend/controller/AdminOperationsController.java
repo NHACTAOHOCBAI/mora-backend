@@ -5,6 +5,7 @@ import com.mora.backend.model.dto.response.ApiResponse;
 import com.mora.backend.model.dto.response.PageResponse;
 import com.mora.backend.model.entity.DocumentStatus;
 import com.mora.backend.service.AdminOperationsService;
+import com.mora.backend.service.AiSettingsService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -12,12 +13,18 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.PutMapping;
 
 @RestController
 @RequestMapping("/api/admin")
 @RequiredArgsConstructor
 public class AdminOperationsController {
     private final AdminOperationsService service;
+    private final AiSettingsService aiSettings;
+
+    @GetMapping("/ai-settings") public ResponseEntity<ApiResponse<AiSettingsService.SettingsView>> aiSettings() { return ok(aiSettings.get()); }
+    @PutMapping("/ai-settings") public ResponseEntity<ApiResponse<AiSettingsService.SettingsView>> updateAiSettings(@RequestBody AiSettingsService.UpdateRequest request) { return ok(aiSettings.update(request)); }
 
     @GetMapping("/dashboard") public ResponseEntity<ApiResponse<AdminOperationsResponses.Dashboard>> dashboard(@RequestParam(defaultValue = "30") int range) {
         return ok(service.dashboard(range));

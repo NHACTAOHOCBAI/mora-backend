@@ -23,6 +23,7 @@ public enum ErrorCode {
     SPACE_NOT_FOUND(1011, "Không tìm thấy Không gian học tập", HttpStatus.NOT_FOUND),
     PDF_PROCESSING_FAILED(1012, "Lỗi bóc tách hoặc xử lý tài liệu PDF", HttpStatus.INTERNAL_SERVER_ERROR),
     AI_ENGINE_ERROR(1013, "Dịch vụ AI đang gặp sự cố. Vui lòng thử lại sau.", HttpStatus.INTERNAL_SERVER_ERROR),
+    AI_CONFIGURATION_REQUIRED(1017, "Dịch vụ AI chưa được cấu hình. Vui lòng liên hệ quản trị viên.", HttpStatus.SERVICE_UNAVAILABLE),
     IMAGE_RESOURCES_NOT_FOUND(1014, "Không tìm thấy tài nguyên hình ảnh trong tài liệu", HttpStatus.NOT_FOUND),
     IMAGE_EXTRACTION_FAILED(1015, "Lỗi trích xuất hình ảnh từ tài liệu", HttpStatus.INTERNAL_SERVER_ERROR),
     OLD_PASSWORD_INCORRECT(1018, "Mật khẩu cũ không chính xác", HttpStatus.BAD_REQUEST),
