@@ -42,6 +42,7 @@ class BenchmarkServiceTest {
         when(runs.save(any())).thenAnswer(call -> {current=call.getArgument(0); current.setId(1L); return current;});
         when(runs.findById(1L)).thenAnswer(call -> Optional.ofNullable(current));
         when(runs.findByStatus(anyString())).thenReturn(List.of());
+        when(runs.updateStatus(anyLong(), anyString())).thenReturn(1);
         var dataset=new BenchmarkDataset(); dataset.setId(1L); dataset.setSpaceId(5L); dataset.setName("fixture");
         dataset.setDefinitionJson("{\"name\":\"fixture\",\"documents\":[{\"code\":\"D1\",\"documentId\":1,\"fileName\":\"one.pdf\"},{\"code\":\"D2\",\"documentId\":2},{\"code\":\"D3\",\"documentId\":3}]}");
         when(datasets.findById(1L)).thenReturn(Optional.of(dataset));
@@ -115,9 +116,9 @@ class BenchmarkServiceTest {
         order.verify(runs).deleteAllInBatch(List.of(completed, active));
     }
     @Test void blocksUndeclaredGroundTruthAndUnreadyDocuments() {
-        question.put("approved",false); assertThrows(IllegalArgumentException.class,()->service.start(1,true));
+        question.put("approved",false); assertThrows(IllegalArgumentException.class,()->service.start(1,true,null));
         question.put("approved",true); documents.findById(1L).orElseThrow().setStatus(DocumentStatus.INDEXING);
-        assertThrows(IllegalArgumentException.class,()->service.start(1,true));
+        assertThrows(IllegalArgumentException.class,()->service.start(1,true,null));
         verify(ai,never()).call(eq("execute"),any());
     }
     private void awaitFinished(CountDownLatch done) throws Exception {
@@ -135,7 +136,8 @@ class BenchmarkServiceTest {
         });
         var done=new CountDownLatch(1);
         when(ai.call(eq("score"),any())).thenAnswer(call -> {done.countDown(); throw new IllegalStateException("judge offline");});
-        var run=service.start(1,true); awaitFinished(done);
+        var run=service.start(1,true,"  Rerank top 8  "); awaitFinished(done);
+        assertEquals("Rerank top 8",run.getName());
         String frozen=run.getSnapshotJson(); question.put("referenceAnswer","EDITED");
         assertEquals(frozen,run.getSnapshotJson()); assertTrue(frozen.contains("SECRET_GROUND_TRUTH"));
         assertEquals("JUDGE_ERROR",stored.get(0).getStatus()); assertNotNull(stored.get(0).getTraceJson());
@@ -151,7 +153,7 @@ class BenchmarkServiceTest {
         assertEquals(123.,metrics.path("latency").path("details").path("totalMs").asDouble());
     }
     @Test void recoveryMarksActiveRunsInterrupted() {
-        var r=new BenchmarkRun(); r.setStatus("RUNNING");
+        var r=new BenchmarkRun(); r.setId(1L); r.setStatus("RUNNING");
         when(runs.findByStatus("RUNNING")).thenReturn(List.of(r)); service.recover(); assertEquals("INTERRUPTED",r.getStatus());
     }
     @Test void summariesRetainMissingErrorsAndNotApplicable() throws Exception {

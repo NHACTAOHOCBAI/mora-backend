@@ -51,6 +51,21 @@ public class BenchmarkService implements DisposableBean {
     public List<BenchmarkDataset> listDatasets() { return datasets.findAllByOrderByIdDesc(); }
     public List<BenchmarkRun> listRuns() { return runs.findAllByOrderByIdDesc(); }
 
+    @Transactional
+    public BenchmarkRun renameRun(long id, String name) {
+        if (runs.updateName(id, runName(name)) == 0) {
+            throw new AppException(ErrorCode.BENCHMARK_RUN_NOT_FOUND);
+        }
+        return runs.findById(id).orElseThrow(() -> new AppException(ErrorCode.BENCHMARK_RUN_NOT_FOUND));
+    }
+
+    private String runName(String name) {
+        if (name == null || name.isBlank()) return null;
+        String trimmed = name.strip();
+        require(trimmed.length() <= 100, "Tên lượt chạy tối đa 100 ký tự");
+        return trimmed;
+    }
+
     public synchronized void deleteRun(long runId) {
         new TransactionTemplate(transactions).executeWithoutResult(tx -> {
             var run = runs.findForDeletion(runId)
@@ -230,11 +245,13 @@ public class BenchmarkService implements DisposableBean {
         config.put("backendCommit",commit(Path.of("."))); config.put("frontendCommit",commit(Path.of("../mora-frontend")));
         return config;
     }
-    public synchronized BenchmarkRun start(long datasetId, boolean smoke) {
+    public synchronized BenchmarkRun start(long datasetId, boolean smoke, String name) {
+        String normalizedName = runName(name);
         require(!busy && runs.findByStatus("RUNNING").isEmpty(),"A benchmark is already running");
         var snap=snapshot(datasetId,smoke); var config=runConfig();
         var r=new TransactionTemplate(transactions).execute(tx -> {
             var row=new BenchmarkRun(); row.setDatasetId(datasetId); row.setStatus("PREPARING"); row.setSmoke(smoke); row.setCreatedAt(Instant.now());
+            row.setName(normalizedName);
             row.setSnapshotJson(snap.toString()); row.setConfigJson(config.toString()); row=runs.save(row);
             for (var q : snap.path("questions")) for (int repetition=1;repetition<=(smoke?1:3);repetition++) {
                 var s=new BenchmarkSample(); s.setRunId(row.getId()); s.setQuestionCode(q.path("code").asText());
@@ -256,12 +273,19 @@ public class BenchmarkService implements DisposableBean {
         launch(r,judgeOnly);
     }
     private void launch(BenchmarkRun r, boolean judgeOnly) {
-        busy=true; r.setStatus("RUNNING"); runs.save(r);
+        require(updateRunStatus(r, "RUNNING") != 0, "Không tìm thấy lượt chạy Benchmark");
+        busy=true;
         worker.submit(() -> {
             try { process(r,judgeOnly); }
-            catch (Exception e) { r.setStatus("INTERRUPTED"); runs.save(r); }
+            catch (Exception e) { updateRunStatus(r, "INTERRUPTED"); }
             finally { synchronized(this) { busy=false; } }
         });
+    }
+
+    private int updateRunStatus(BenchmarkRun run, String status) {
+        int updated = runs.updateStatus(run.getId(), status);
+        run.setStatus(status);
+        return updated;
     }
     private void process(BenchmarkRun run, boolean judgeOnly) {
         var snap=parse(run.getSnapshotJson()); var config=parse(run.getConfigJson()).path("ai");
@@ -303,11 +327,11 @@ public class BenchmarkService implements DisposableBean {
             samples.save(s);
         }
         boolean errors=samples.findByRunIdOrderByIdAsc(run.getId()).stream().anyMatch(s -> !"COMPLETED".equals(s.getStatus()));
-        run.setStatus(errors?"COMPLETED_WITH_ERRORS":"COMPLETED"); runs.save(run);
+        updateRunStatus(run, errors ? "COMPLETED_WITH_ERRORS" : "COMPLETED");
     }
     @EventListener(ApplicationReadyEvent.class)
     public void recover() {
-        for (String status : List.of("RUNNING","PREPARING")) for (var r : runs.findByStatus(status)) { r.setStatus("INTERRUPTED"); runs.save(r); }
+        for (String status : List.of("RUNNING","PREPARING")) for (var r : runs.findByStatus(status)) updateRunStatus(r, "INTERRUPTED");
     }
     public Map<String,Object> run(long id) {
         var r=runs.findById(id).orElseThrow(); var rows=samples.findByRunIdOrderByIdAsc(id);

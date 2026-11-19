@@ -5,6 +5,7 @@ import lombok.*;
 public class BenchmarkRun {
 @Id @GeneratedValue(strategy=GenerationType.IDENTITY) private Long id;
 private Long datasetId;
+@Column(length=100) private String name;
 private String status;
 private boolean smoke;
 private java.time.Instant createdAt;

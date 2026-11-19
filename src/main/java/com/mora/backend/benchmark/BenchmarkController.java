@@ -31,8 +31,18 @@ public class BenchmarkController {
         service.upload(id,code,file); return ok(service.definition(id));
     }
     @GetMapping("/runs") public Object runs() { return ok(service.listRuns()); }
-    @PostMapping("/datasets/{id}/runs") public Object start(@PathVariable long id,@RequestBody String body) { return ok(service.start(id,service.parse(body).path("smoke").asBoolean())); }
+    @PostMapping("/datasets/{id}/runs")
+    public Object start(@PathVariable long id, @RequestBody String body) {
+        var request = service.parse(body);
+        return ok(service.start(id, request.path("smoke").asBoolean(), request.path("name").asText(null)));
+    }
     @GetMapping("/runs/{id}") public Object run(@PathVariable long id) { return ok(service.run(id)); }
+    public record RenameRunRequest(String name) {}
+
+    @PatchMapping("/runs/{id}")
+    public Object renameRun(@PathVariable long id, @RequestBody RenameRunRequest request) {
+        return ok(service.renameRun(id, request.name()));
+    }
     @DeleteMapping("/runs/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void deleteRun(@PathVariable long id) { service.deleteRun(id); }
