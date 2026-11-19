@@ -30,6 +30,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
 
 @Service
 @RequiredArgsConstructor
@@ -331,8 +332,13 @@ public class ChatServiceImpl implements ChatService {
                            AtomicBoolean cancelled, String documentIdsJson, String generationId, AtomicLong sequence) {
         StringBuilder answer = new StringBuilder();
         List<SpaceChatResponse.SpaceCitation> citations = new ArrayList<>();
+        AtomicReference<String> upstreamError = new AtomicReference<>();
         try {
             aiServiceClient.streamChat(python, event -> {
+                if ("error".equals(event.name())) {
+                    upstreamError.set(event.payload().path("message").asText(ErrorCode.AI_ENGINE_ERROR.getMessage()));
+                    return;
+                }
                 try {
                     if ("delta".equals(event.name())) {
                         String text = event.payload().path("text").asText(""); answer.append(text);
@@ -347,6 +353,12 @@ public class ChatServiceImpl implements ChatService {
                     emitStreamEvent(space, emitter, generationId, sequence, event.name(), payload);
                 } catch (RuntimeException streamClosed) { cancelled.set(true); }
             }, cancelled::get);
+            if (upstreamError.get() != null || (!cancelled.get() && answer.toString().isBlank())) {
+                String message = Optional.ofNullable(upstreamError.get()).orElse(ErrorCode.AI_ENGINE_ERROR.getMessage());
+                emitStreamEvent(space, emitter, generationId, sequence, "error", Map.of("text", message));
+                emitter.complete();
+                return;
+            }
             String citationsJson = objectMapper.writeValueAsString(citations);
             ChatMessage message = chatMessageRepository.save(ChatMessage.builder().sender("assistant").messageType(MessageType.AI_RESPONSE)
                     .text(answer.toString()).space(space).citations(citationsJson).selectedDocumentIds(documentIdsJson).build());
@@ -391,7 +403,10 @@ public class ChatServiceImpl implements ChatService {
         }
 
         List<ChatMessage> messages = chatMessageRepository.findBySpaceIdOrderByCreatedAtAsc(spaceId);
-        return messages.stream().map(this::mapToResponse).toList();
+        return messages.stream()
+                .filter(message -> message.getMessageType() != MessageType.AI_RESPONSE || !message.getText().isBlank())
+                .map(this::mapToResponse)
+                .toList();
     }
 
     @Override
