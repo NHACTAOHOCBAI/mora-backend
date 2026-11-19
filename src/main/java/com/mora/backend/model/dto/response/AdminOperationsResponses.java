@@ -42,6 +42,9 @@ public final class AdminOperationsResponses {
     @Data @Builder @NoArgsConstructor @AllArgsConstructor
     public static class AiUsageSummary {
         private long totalTokens;
+        private long uncachedInputTokens;
+        private long cachedInputTokens;
+        private long outputTokens;
         private BigDecimal totalCostVnd;
         private long requestCount;
         private LocalDateTime trackingStartedAt;
@@ -58,6 +61,9 @@ public final class AdminOperationsResponses {
     @Data @Builder @NoArgsConstructor @AllArgsConstructor
     public static class AiUsageBreakdown {
         private String key; private long totalTokens; private BigDecimal costVnd; private long requestCount;
+        private long uncachedInputTokens;
+        private long cachedInputTokens;
+        private long outputTokens;
     }
 
     @Data @Builder @NoArgsConstructor @AllArgsConstructor

@@ -154,7 +154,9 @@ public class AdminOperationsServiceImpl implements AdminOperationsService {
             daily.add(AdminOperationsResponses.DailyAiUsage.builder().date(date).totalTokens(values.stream().mapToLong(AiUsageEvent::getTotalTokens).sum())
                     .costVnd(sumCost(values)).requestCount(values.size()).build());
         }
-        return AdminOperationsResponses.AiUsageSummary.builder().totalTokens(events.stream().mapToLong(AiUsageEvent::getTotalTokens).sum())
+        var tokens = tokenTotals(events);
+        return AdminOperationsResponses.AiUsageSummary.builder().totalTokens(tokens.total())
+                .uncachedInputTokens(tokens.uncachedInput()).cachedInputTokens(tokens.cachedInput()).outputTokens(tokens.output())
                 .totalCostVnd(sumCost(events)).requestCount(events.size())
                 .trackingStartedAt(aiUsage.findFirstByOrderByCreatedAtAsc().map(AiUsageEvent::getCreatedAt).orElse(null))
                 .daily(daily).byOperation(breakdown(events, true)).byModel(breakdown(events, false)).build();
@@ -162,9 +164,28 @@ public class AdminOperationsServiceImpl implements AdminOperationsService {
 
     private List<AdminOperationsResponses.AiUsageBreakdown> breakdown(List<AiUsageEvent> events, boolean operation) {
         Map<String, List<AiUsageEvent>> grouped = events.stream().collect(Collectors.groupingBy(event -> operation ? event.getOperation() : event.getModel()));
-        return grouped.entrySet().stream().map(entry -> AdminOperationsResponses.AiUsageBreakdown.builder().key(entry.getKey())
-                .totalTokens(entry.getValue().stream().mapToLong(AiUsageEvent::getTotalTokens).sum()).costVnd(sumCost(entry.getValue()))
-                .requestCount(entry.getValue().size()).build()).sorted(Comparator.comparing(AdminOperationsResponses.AiUsageBreakdown::getCostVnd).reversed()).toList();
+        return grouped.entrySet().stream().map(entry -> {
+            var values = entry.getValue();
+            var tokens = tokenTotals(values);
+            return AdminOperationsResponses.AiUsageBreakdown.builder().key(entry.getKey())
+                    .totalTokens(tokens.total()).uncachedInputTokens(tokens.uncachedInput())
+                    .cachedInputTokens(tokens.cachedInput()).outputTokens(tokens.output())
+                    .costVnd(sumCost(values)).requestCount(values.size()).build();
+        }).sorted(Comparator.comparing(AdminOperationsResponses.AiUsageBreakdown::getCostVnd).reversed()).toList();
+    }
+
+    private record TokenTotals(long total, long uncachedInput, long cachedInput, long output) {}
+
+    private TokenTotals tokenTotals(List<AiUsageEvent> events) {
+        long total = 0, uncachedInput = 0, cachedInput = 0, output = 0;
+        for (AiUsageEvent event : events) {
+            long cached = event.getCachedInputTokens();
+            total += event.getTotalTokens();
+            uncachedInput += Math.max(0, event.getInputTokens() - cached);
+            cachedInput += cached;
+            output += event.getOutputTokens();
+        }
+        return new TokenTotals(total, uncachedInput, cachedInput, output);
     }
     private BigDecimal sumCost(List<AiUsageEvent> events) { return events.stream().map(AiUsageEvent::getEstimatedCostVnd).filter(java.util.Objects::nonNull).reduce(BigDecimal.ZERO, BigDecimal::add); }
     private long countCreated(List<? extends Object> records, LocalDate date) {
