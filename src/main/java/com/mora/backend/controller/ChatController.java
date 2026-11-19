@@ -12,6 +12,8 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.MediaType;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -46,6 +48,21 @@ public class ChatController {
                         .result(response)
                         .build()
         );
+    }
+
+    @PostMapping(value = "/space/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    @Operation(summary = "Hỏi AI và nhận câu trả lời theo từng phần")
+    public SseEmitter streamChatWithSpace(@Valid @RequestBody SpaceChatRequest request,
+                                          @RequestHeader("X-Chat-Request-Id") String requestId) {
+        return chatService.streamChatWithSpace(request, requestId);
+    }
+
+    @DeleteMapping("/space/stream/{requestId}")
+    @Operation(summary = "Dừng câu trả lời AI đang được sinh")
+    public ResponseEntity<ApiResponse<Void>> cancelStream(@RequestParam Long spaceId,
+                                                           @PathVariable String requestId) {
+        chatService.cancelStream(spaceId, requestId);
+        return ResponseEntity.ok(ApiResponse.<Void>builder().message("Đã yêu cầu dừng tạo câu trả lời").build());
     }
 
     @GetMapping("/space/{spaceId}")

@@ -10,7 +10,14 @@ import org.springframework.web.client.RestTemplate;
 import java.util.List;
 import java.util.Map;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mora.backend.service.AiUsageService;
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
+import java.util.function.BooleanSupplier;
+import java.util.function.Consumer;
 
 @Component
 @Slf4j
@@ -82,6 +89,39 @@ public class AiServiceClient {
         } catch (Exception e) {
             log.error("Failed to call Python AI service /api/chat", e);
             throw new AppException(ErrorCode.AI_ENGINE_ERROR);
+        }
+    }
+
+    public record StreamEvent(String name, JsonNode payload) {}
+
+    /** Proxy Python SSE without buffering the generated answer. */
+    public void streamChat(PythonChatRequest payload, Consumer<StreamEvent> consumer, BooleanSupplier cancelled) {
+        String url = aiServiceUrl + "/api/chat/stream";
+        ObjectMapper mapper = new ObjectMapper();
+        try {
+            restTemplate.execute(url, org.springframework.http.HttpMethod.POST,
+                    request -> {
+                        request.getHeaders().setContentType(org.springframework.http.MediaType.APPLICATION_JSON);
+                        mapper.writeValue(request.getBody(), payload);
+                    }, response -> {
+                        try (BufferedReader reader = new BufferedReader(new InputStreamReader(response.getBody(), StandardCharsets.UTF_8))) {
+                            String line, event = "message", data = null;
+                            while (!cancelled.getAsBoolean() && (line = reader.readLine()) != null) {
+                                if (line.startsWith("event:")) event = line.substring(6).trim();
+                                else if (line.startsWith("data:")) data = line.substring(5).trim();
+                                else if (line.isBlank() && data != null) {
+                                    consumer.accept(new StreamEvent(event, mapper.readTree(data)));
+                                    event = "message"; data = null;
+                                }
+                            }
+                        }
+                        return null;
+                    });
+        } catch (Exception e) {
+            if (!cancelled.getAsBoolean()) {
+                log.error("Failed to stream Python AI service", e);
+                throw new AppException(ErrorCode.AI_ENGINE_ERROR);
+            }
         }
     }
 

@@ -6,6 +6,7 @@ import com.mora.backend.model.dto.response.ChatMessageResponse;
 import com.mora.backend.model.dto.response.SpaceChatResponse;
 
 import java.util.List;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 public interface ChatService {
     /**
@@ -23,6 +24,10 @@ public interface ChatService {
      * @return DTO chứa câu trả lời và các trích dẫn
      */
     SpaceChatResponse chatWithSpace(SpaceChatRequest request);
+
+    SseEmitter streamChatWithSpace(SpaceChatRequest request, String requestId);
+
+    void cancelStream(Long spaceId, String requestId);
 
     /**
      * Lấy toàn bộ lịch sử cuộc trò chuyện (cả tin nhắn nhóm và phản hồi AI) của một Không gian học tập.

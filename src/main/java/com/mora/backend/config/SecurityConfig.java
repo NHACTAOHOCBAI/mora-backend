@@ -3,6 +3,7 @@ package com.mora.backend.config;
 import com.mora.backend.security.JwtAuthenticationEntryPoint;
 import com.mora.backend.security.JwtAuthenticationFilter;
 import com.mora.backend.security.RestAccessDeniedHandler;
+import jakarta.servlet.DispatcherType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -42,13 +43,16 @@ public class SecurityConfig {
                         .authenticationEntryPoint(jwtAuthenticationEntryPoint)
                         .accessDeniedHandler(restAccessDeniedHandler))
                 .authorizeHttpRequests(auth -> auth
+                        // The initial SSE request is authenticated normally. Spring
+                        // performs an ASYNC redispatch while SseEmitter is flushing;
+                        // it has no request JWT header to authenticate again.
+                        .dispatcherTypeMatchers(DispatcherType.ASYNC, DispatcherType.ERROR).permitAll()
                         .requestMatchers(
                                 "/api/auth/**",
                                 "/swagger-ui/**",
                                 "/swagger-ui.html",
                                 "/api-docs/**",
                                 "/v3/api-docs/**",
-                                "/api/chat/stream/**",
                                 "/ws/**",
                                 "/api/hello",
                                 "/actuator/health/liveness",

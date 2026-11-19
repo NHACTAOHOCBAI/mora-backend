@@ -17,11 +17,19 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.time.LocalDateTime;
+import java.io.IOException;
+import java.util.Map;
+import java.util.HashMap;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 
 @Service
 @RequiredArgsConstructor
@@ -41,6 +49,7 @@ public class ChatServiceImpl implements ChatService {
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     private static final int SUMMARY_BATCH_INTERVAL = 6;
+    private final Map<String, AtomicBoolean> activeStreams = new ConcurrentHashMap<>();
 
     @Override
     @Transactional
@@ -243,6 +252,127 @@ public class ChatServiceImpl implements ChatService {
                 .answer(pythonResponse.answer)
                 .citations(responseCitations)
                 .build();
+    }
+
+    @Override
+    @Transactional
+    public SseEmitter streamChatWithSpace(SpaceChatRequest request, String requestId) {
+        User currentUser = userService.getCurrentUser();
+        Space space = spaceRepository.findById(request.getSpaceId())
+                .orElseThrow(() -> new AppException(ErrorCode.SPACE_NOT_FOUND));
+        if (currentUser.getRole() != Role.ROLE_ADMIN && getUserRole(space, currentUser) == null) {
+            throw new AppException(ErrorCode.UNAUTHORIZED);
+        }
+        String key = streamKey(space.getId(), requestId);
+        if (activeStreams.putIfAbsent(key, new AtomicBoolean(false)) != null) {
+            throw new AppException(ErrorCode.INVALID_REQUEST_PARAMETER);
+        }
+
+        List<Document> documents = request.getDocumentIds() != null && !request.getDocumentIds().isEmpty()
+                ? documentRepository.findAllById(request.getDocumentIds()) : documentRepository.findBySpaceId(space.getId());
+        if (request.getDocumentIds() != null && !request.getDocumentIds().isEmpty() &&
+                (documents.size() != request.getDocumentIds().stream().distinct().count() ||
+                 documents.stream().anyMatch(doc -> !doc.getSpace().getId().equals(space.getId())))) {
+            activeStreams.remove(key);
+            throw new AppException(ErrorCode.SPACE_ACCESS_DENIED);
+        }
+        documents = documents.stream().filter(doc -> doc.getStatus() == DocumentStatus.READY).toList();
+        List<AiServiceClient.PythonChatRequest.ContextItem> context = new ArrayList<>();
+        for (Document doc : documents) for (DocumentPage page : documentPageRepository.findByDocumentIdOrderByPageNumberAsc(doc.getId())) {
+            AiServiceClient.PythonChatRequest.ContextItem item = new AiServiceClient.PythonChatRequest.ContextItem();
+            item.pageNumber = page.getPageNumber(); item.text = page.getText(); item.documentId = doc.getId(); item.documentName = doc.getName();
+            context.add(item);
+        }
+        List<AiServiceClient.PythonChatRequest.HistoryItem> history = request.getHistory() == null ? new ArrayList<>() : request.getHistory().stream().map(h -> {
+            AiServiceClient.PythonChatRequest.HistoryItem item = new AiServiceClient.PythonChatRequest.HistoryItem();
+            item.sender = h.getSender(); item.text = h.getText(); return item;
+        }).toList();
+        String docIdsJson = "";
+        try { if (request.getDocumentIds() != null) docIdsJson = objectMapper.writeValueAsString(request.getDocumentIds()); } catch (Exception ignored) { }
+        ChatMessage userMessage = chatMessageRepository.save(ChatMessage.builder().sender("user").messageType(MessageType.AI_QUERY)
+                .user(currentUser).text(request.getQuestion()).selectedDocumentIds(docIdsJson).space(space).build());
+        touchActivity(space);
+        messagingTemplate.convertAndSend("/topic/spaces/" + space.getId() + "/messages", mapToResponse(userMessage));
+
+        AiServiceClient.PythonChatRequest python = new AiServiceClient.PythonChatRequest();
+        python.question = request.getQuestion(); python.spaceId = space.getId(); python.documentIds = documents.stream().map(Document::getId).toList();
+        python.context = context; python.history = history; python.chatSummary = space.getChatSummary();
+        SseEmitter emitter = new SseEmitter(0L);
+        AtomicBoolean cancelled = activeStreams.get(key);
+        AtomicLong sequence = new AtomicLong();
+        emitter.onTimeout(() -> {
+            cancelled.set(true);
+            activeStreams.remove(key);
+        });
+        emitter.onError(error -> {
+            cancelled.set(true);
+            activeStreams.remove(key);
+        });
+        emitter.onCompletion(() -> activeStreams.remove(key));
+        final String selectedDocumentIds = docIdsJson;
+        emitStreamEvent(space, emitter, requestId, sequence, "accepted", Map.of("message", mapToResponse(userMessage)));
+        CompletableFuture.runAsync(() -> runStream(space, python, emitter, key, cancelled, selectedDocumentIds, requestId, sequence));
+        return emitter;
+    }
+
+    @Override
+    public void cancelStream(Long spaceId, String requestId) {
+        User currentUser = userService.getCurrentUser();
+        Space space = spaceRepository.findById(spaceId).orElseThrow(() -> new AppException(ErrorCode.SPACE_NOT_FOUND));
+        if (currentUser.getRole() != Role.ROLE_ADMIN && getUserRole(space, currentUser) == null) throw new AppException(ErrorCode.UNAUTHORIZED);
+        AtomicBoolean cancelled = activeStreams.get(streamKey(spaceId, requestId));
+        if (cancelled != null) cancelled.set(true);
+    }
+
+    private void runStream(Space space, AiServiceClient.PythonChatRequest python, SseEmitter emitter, String key,
+                           AtomicBoolean cancelled, String documentIdsJson, String generationId, AtomicLong sequence) {
+        StringBuilder answer = new StringBuilder();
+        List<SpaceChatResponse.SpaceCitation> citations = new ArrayList<>();
+        try {
+            aiServiceClient.streamChat(python, event -> {
+                try {
+                    if ("delta".equals(event.name())) {
+                        String text = event.payload().path("text").asText(""); answer.append(text);
+                    } else if ("citations".equals(event.name()) && event.payload().has("citations")) {
+                        for (var node : event.payload().path("citations")) citations.add(SpaceChatResponse.SpaceCitation.builder()
+                                .pageNumber(node.path("pageNumber").asInt()).quote(node.path("quote").asText())
+                                .documentId(node.hasNonNull("documentId") ? node.get("documentId").asLong() : null)
+                                .documentName(node.path("documentName").asText(null)).build());
+                    }
+                    @SuppressWarnings("unchecked")
+                    Map<String, Object> payload = objectMapper.convertValue(event.payload(), Map.class);
+                    emitStreamEvent(space, emitter, generationId, sequence, event.name(), payload);
+                } catch (RuntimeException streamClosed) { cancelled.set(true); }
+            }, cancelled::get);
+            String citationsJson = objectMapper.writeValueAsString(citations);
+            ChatMessage message = chatMessageRepository.save(ChatMessage.builder().sender("assistant").messageType(MessageType.AI_RESPONSE)
+                    .text(answer.toString()).space(space).citations(citationsJson).selectedDocumentIds(documentIdsJson).build());
+            ChatMessageResponse response = mapToResponse(message);
+            messagingTemplate.convertAndSend("/topic/spaces/" + space.getId() + "/messages", response);
+            emitStreamEvent(space, emitter, generationId, sequence, "done",
+                    Map.of("status", cancelled.get() ? "cancelled" : "completed", "message", response));
+            emitter.complete();
+        } catch (Exception error) {
+            log.error("AI streaming failed", error);
+            try { emitStreamEvent(space, emitter, generationId, sequence, "error", Map.of("text", "Dịch vụ AI đang gặp sự cố. Vui lòng thử lại sau.")); } catch (Exception ignored) { }
+            emitter.completeWithError(error);
+        } finally { activeStreams.remove(key); }
+    }
+
+    private String streamKey(Long spaceId, String requestId) { return spaceId + ":" + requestId; }
+
+    private void emitStreamEvent(Space space, SseEmitter emitter, String generationId, AtomicLong sequence,
+                                 String type, Map<String, ?> body) {
+        Map<String, Object> event = new HashMap<>(body);
+        event.put("type", type);
+        event.put("generationId", generationId);
+        event.put("sequence", sequence.incrementAndGet());
+        try {
+            emitter.send(SseEmitter.event().name(type).data(event));
+        } catch (IOException error) {
+            throw new RuntimeException(error);
+        }
+        messagingTemplate.convertAndSend("/topic/spaces/" + space.getId() + "/ai-stream", (Object) event);
     }
 
     @Override
