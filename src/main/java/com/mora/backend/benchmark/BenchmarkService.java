@@ -2,6 +2,8 @@ package com.mora.backend.benchmark;
 
 import com.fasterxml.jackson.databind.*;
 import com.fasterxml.jackson.databind.node.*;
+import com.mora.backend.exception.AppException;
+import com.mora.backend.exception.ErrorCode;
 import com.mora.backend.model.entity.*;
 import com.mora.backend.repository.*;
 import com.mora.backend.service.UserService;
@@ -23,6 +25,7 @@ import java.util.concurrent.*;
 
 @Service @RequiredArgsConstructor
 public class BenchmarkService implements DisposableBean {
+    private static final Set<String> DELETABLE_RUN_STATUSES = Set.of("COMPLETED", "COMPLETED_WITH_ERRORS", "INTERRUPTED");
     private final BenchmarkDatasetRepository datasets;
     private final BenchmarkQuestionRepository questions;
     private final BenchmarkRunRepository runs;
@@ -47,6 +50,50 @@ public class BenchmarkService implements DisposableBean {
     private BenchmarkDataset dataset(long id) { return datasets.findById(id).orElseThrow(() -> new IllegalArgumentException("Dataset not found")); }
     public List<BenchmarkDataset> listDatasets() { return datasets.findAllByOrderByIdDesc(); }
     public List<BenchmarkRun> listRuns() { return runs.findAllByOrderByIdDesc(); }
+
+    public synchronized void deleteRun(long runId) {
+        new TransactionTemplate(transactions).executeWithoutResult(tx -> {
+            var run = runs.findForDeletion(runId)
+                    .orElseThrow(() -> new AppException(ErrorCode.BENCHMARK_RUN_NOT_FOUND));
+            if (!isDeletable(run)) {
+                throw new AppException(ErrorCode.BENCHMARK_RUN_NOT_DELETABLE);
+            }
+            samples.deleteSamplesForRun(runId);
+            runs.delete(run);
+        });
+    }
+
+    public synchronized void deleteRuns(List<Long> requestedIds) {
+        if (requestedIds == null || requestedIds.isEmpty() || requestedIds.stream().anyMatch(id -> id == null || id <= 0)) {
+            throw new AppException(ErrorCode.INVALID_REQUEST_PARAMETER);
+        }
+        var ids = requestedIds.stream().distinct().sorted().toList();
+        new TransactionTemplate(transactions).executeWithoutResult(tx -> {
+            var selected = runs.findAllForDeletion(ids);
+            var missing = new TreeSet<>(ids);
+            selected.forEach(run -> missing.remove(run.getId()));
+            var ineligible = selected.stream().filter(run -> !isDeletable(run)).map(BenchmarkRun::getId).toList();
+            if (!missing.isEmpty() || !ineligible.isEmpty()) {
+                throw new BulkDeleteConflict(List.copyOf(missing), ineligible);
+            }
+            samples.deleteSamplesForRuns(ids);
+            runs.deleteAllInBatch(selected);
+        });
+    }
+
+    private boolean isDeletable(BenchmarkRun run) {
+        return run.getStatus() != null && DELETABLE_RUN_STATUSES.contains(run.getStatus());
+    }
+
+    static final class BulkDeleteConflict extends RuntimeException {
+        final List<Long> missingIds;
+        final List<Long> ineligibleIds;
+
+        BulkDeleteConflict(List<Long> missingIds, List<Long> ineligibleIds) {
+            this.missingIds = missingIds;
+            this.ineligibleIds = ineligibleIds;
+        }
+    }
 
     public ObjectNode definition(long id) {
         var d = dataset(id);

@@ -2,6 +2,8 @@ package com.mora.backend.benchmark;
 
 import com.fasterxml.jackson.databind.*;
 import com.fasterxml.jackson.databind.node.*;
+import com.mora.backend.exception.AppException;
+import com.mora.backend.exception.ErrorCode;
 import com.mora.backend.model.entity.*;
 import com.mora.backend.repository.*;
 import com.mora.backend.service.UserService;
@@ -61,6 +63,57 @@ class BenchmarkServiceTest {
         });
     }
     @AfterEach void close() {service.destroy();}
+
+    @Test void deletesOnlySamplesBelongingToTheSelectedRunBeforeDeletingIt() {
+        var run = new BenchmarkRun();
+        run.setId(42L);
+        run.setStatus("COMPLETED_WITH_ERRORS");
+        when(runs.findForDeletion(42L)).thenReturn(Optional.of(run));
+
+        service.deleteRun(42L);
+
+        var order = inOrder(samples, runs);
+        order.verify(runs).findForDeletion(42L);
+        order.verify(samples).deleteSamplesForRun(42L);
+        order.verify(runs).delete(run);
+    }
+
+    @Test void rejectsDeletionOfActiveAndMissingRuns() {
+        var active = new BenchmarkRun();
+        active.setStatus("RUNNING");
+        when(runs.findForDeletion(42L)).thenReturn(Optional.of(active));
+        when(runs.findForDeletion(99L)).thenReturn(Optional.empty());
+
+        assertEquals(ErrorCode.BENCHMARK_RUN_NOT_DELETABLE, assertThrows(AppException.class, () -> service.deleteRun(42L)).getErrorCode());
+        assertEquals(ErrorCode.BENCHMARK_RUN_NOT_FOUND, assertThrows(AppException.class, () -> service.deleteRun(99L)).getErrorCode());
+        verify(samples, never()).deleteSamplesForRun(anyLong());
+        verify(runs, never()).delete(any());
+    }
+
+    @Test void bulkDeleteValidatesEveryRunBeforeDeletingAnything() {
+        var completed = new BenchmarkRun();
+        completed.setId(1L);
+        completed.setStatus("COMPLETED");
+        var active = new BenchmarkRun();
+        active.setId(2L);
+        active.setStatus("RUNNING");
+        when(runs.findAllForDeletion(List.of(1L, 2L, 3L))).thenReturn(List.of(completed, active));
+
+        var error = assertThrows(BenchmarkService.BulkDeleteConflict.class,
+                () -> service.deleteRuns(List.of(3L, 2L, 1L, 1L)));
+        assertEquals(List.of(3L), error.missingIds);
+        assertEquals(List.of(2L), error.ineligibleIds);
+        verify(samples, never()).deleteSamplesForRuns(anyList());
+        verify(runs, never()).deleteAllInBatch(anyList());
+
+        when(runs.findAllForDeletion(List.of(1L, 2L))).thenReturn(List.of(completed, active));
+        active.setStatus("INTERRUPTED");
+        service.deleteRuns(List.of(2L, 1L));
+        var order = inOrder(samples, runs);
+        order.verify(runs).findAllForDeletion(List.of(1L, 2L));
+        order.verify(samples).deleteSamplesForRuns(List.of(1L, 2L));
+        order.verify(runs).deleteAllInBatch(List.of(completed, active));
+    }
     @Test void blocksUndeclaredGroundTruthAndUnreadyDocuments() {
         question.put("approved",false); assertThrows(IllegalArgumentException.class,()->service.start(1,true));
         question.put("approved",true); documents.findById(1L).orElseThrow().setStatus(DocumentStatus.INDEXING);

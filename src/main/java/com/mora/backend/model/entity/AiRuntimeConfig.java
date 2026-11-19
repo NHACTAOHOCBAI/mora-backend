@@ -8,7 +8,7 @@ import java.time.LocalDateTime;
 /** Singleton control-plane configuration. The provider key is AES-GCM encrypted. */
 @Entity
 @Table(name = "ai_runtime_config")
-@Data @Builder @NoArgsConstructor @AllArgsConstructor
+@Data @Builder(toBuilder = true) @NoArgsConstructor @AllArgsConstructor
 public class AiRuntimeConfig {
     @Id private Long id;
     @Column(name = "encrypted_api_key", columnDefinition = "TEXT") private String encryptedApiKey;

@@ -37,7 +37,9 @@ public enum ErrorCode {
     DOCUMENT_TOO_LARGE(1027, "Kích thước tài liệu không được vượt quá 15MB", HttpStatus.PAYLOAD_TOO_LARGE),
     MALFORMED_REQUEST(1028, "Dữ liệu gửi lên không đúng định dạng", HttpStatus.BAD_REQUEST),
     MISSING_REQUEST_DATA(1029, "Thiếu thông tin bắt buộc", HttpStatus.BAD_REQUEST),
-    INVALID_REQUEST_PARAMETER(1030, "Tham số yêu cầu không hợp lệ", HttpStatus.BAD_REQUEST)
+    INVALID_REQUEST_PARAMETER(1030, "Tham số yêu cầu không hợp lệ", HttpStatus.BAD_REQUEST),
+    BENCHMARK_RUN_NOT_FOUND(1031, "Không tìm thấy lượt chạy Benchmark", HttpStatus.NOT_FOUND),
+    BENCHMARK_RUN_NOT_DELETABLE(1032, "Chỉ có thể xóa lượt chạy đã hoàn tất hoặc bị gián đoạn", HttpStatus.CONFLICT)
     ;
 
     private final int code;

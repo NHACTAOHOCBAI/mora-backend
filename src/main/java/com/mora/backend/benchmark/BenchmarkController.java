@@ -33,6 +33,29 @@ public class BenchmarkController {
     @GetMapping("/runs") public Object runs() { return ok(service.listRuns()); }
     @PostMapping("/datasets/{id}/runs") public Object start(@PathVariable long id,@RequestBody String body) { return ok(service.start(id,service.parse(body).path("smoke").asBoolean())); }
     @GetMapping("/runs/{id}") public Object run(@PathVariable long id) { return ok(service.run(id)); }
+    @DeleteMapping("/runs/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteRun(@PathVariable long id) { service.deleteRun(id); }
+
+    public record BulkDeleteRequest(List<Long> runIds) {}
+
+    @PostMapping("/runs/bulk-delete")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteRuns(@RequestBody BulkDeleteRequest request) { service.deleteRuns(request.runIds()); }
+
+    @ExceptionHandler(BenchmarkService.BulkDeleteConflict.class)
+    public ResponseEntity<?> bulkDeleteConflict(BenchmarkService.BulkDeleteConflict error) {
+        var reasons = new ArrayList<String>();
+        if (!error.missingIds.isEmpty()) reasons.add("Lượt không còn tồn tại " + runNumbers(error.missingIds));
+        if (!error.ineligibleIds.isEmpty()) reasons.add("Lượt chưa thể xóa " + runNumbers(error.ineligibleIds));
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(ApiResponse.builder().code(409)
+                .message(String.join(". ", reasons) + ". Chưa xóa lượt nào.")
+                .result(Map.of("missingIds", error.missingIds, "ineligibleIds", error.ineligibleIds)).build());
+    }
+
+    private String runNumbers(List<Long> ids) {
+        return String.join(", ", ids.stream().map(id -> "#" + id).toList());
+    }
     @PostMapping("/runs/{id}/resume") public Object resume(@PathVariable long id) { service.resume(id,false); return ok(service.run(id)); }
     @PostMapping("/runs/{id}/retry-judge") public Object retry(@PathVariable long id) { service.resume(id,true); return ok(service.run(id)); }
     @GetMapping("/runs/{id}/export") public ResponseEntity<?> export(@PathVariable long id,@RequestParam(defaultValue="json") String format) {

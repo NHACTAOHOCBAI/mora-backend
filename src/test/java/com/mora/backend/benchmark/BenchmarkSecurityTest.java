@@ -14,10 +14,13 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 import org.springframework.security.web.FilterChainProxy;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.never;
 import static org.mockito.ArgumentMatchers.any;
 
 @WebMvcTest(BenchmarkController.class)
@@ -42,6 +45,31 @@ class BenchmarkSecurityTest {
     }
     @Test void adminAllowed() throws Exception {
         authenticate("ROLE_ADMIN"); mvc.perform(get("/api/admin/benchmarks/datasets").header("Authorization","Bearer test-token")).andExpect(status().isOk());
+    }
+    @Test void onlyAdminCanDeleteRuns() throws Exception {
+        var request = delete("/api/admin/benchmarks/runs/42").header("Authorization", "Bearer test-token");
+        authenticate("ROLE_USER");
+        mvc.perform(request).andExpect(status().isForbidden());
+        verify(service, never()).deleteRun(42L);
+
+        authenticate("ROLE_ADMIN");
+        mvc.perform(request).andExpect(status().isNoContent());
+        verify(service).deleteRun(42L);
+    }
+
+    @Test void bulkDeleteIsAdminOnlyAndReturnsConflictingIds() throws Exception {
+        var request = post("/api/admin/benchmarks/runs/bulk-delete").contentType("application/json")
+                .content("{\"runIds\":[1,2]}").header("Authorization", "Bearer test-token");
+        authenticate("ROLE_USER");
+        mvc.perform(request).andExpect(status().isForbidden());
+        verify(service, never()).deleteRuns(any());
+
+        authenticate("ROLE_ADMIN");
+        org.mockito.Mockito.doThrow(new BenchmarkService.BulkDeleteConflict(java.util.List.of(1L), java.util.List.of(2L)))
+                .when(service).deleteRuns(java.util.List.of(1L, 2L));
+        mvc.perform(request).andExpect(status().isConflict())
+                .andExpect(jsonPath("$.result.missingIds[0]").value(1))
+                .andExpect(jsonPath("$.result.ineligibleIds[0]").value(2));
     }
     @Test void jsonDatasetRequestAndResponseAreCompatible() throws Exception {
         authenticate("ROLE_ADMIN");

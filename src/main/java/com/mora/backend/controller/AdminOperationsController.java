@@ -26,6 +26,12 @@ public class AdminOperationsController {
     @GetMapping("/ai-settings") public ResponseEntity<ApiResponse<AiSettingsService.SettingsView>> aiSettings() { return ok(aiSettings.get()); }
     @PutMapping("/ai-settings") public ResponseEntity<ApiResponse<AiSettingsService.SettingsView>> updateAiSettings(@RequestBody AiSettingsService.UpdateRequest request) { return ok(aiSettings.update(request)); }
 
+    @GetMapping("/ai-settings/history")
+    public ResponseEntity<ApiResponse<PageResponse<AiSettingsService.HistoryEntry>>> aiSettingsHistory(
+            @RequestParam(defaultValue = "0") int page) {
+        return ok(aiSettings.history(page));
+    }
+
     @GetMapping("/dashboard") public ResponseEntity<ApiResponse<AdminOperationsResponses.Dashboard>> dashboard(@RequestParam(defaultValue = "30") int range) {
         return ok(service.dashboard(range));
     }

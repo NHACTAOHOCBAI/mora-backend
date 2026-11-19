@@ -1,15 +1,21 @@
 package com.mora.backend.service.impl;
 
 import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mora.backend.exception.AppException;
 import com.mora.backend.exception.ErrorCode;
+import com.mora.backend.model.dto.response.PageResponse;
 import com.mora.backend.model.entity.AiRuntimeConfig;
+import com.mora.backend.model.entity.AiSettingsHistory;
 import com.mora.backend.repository.AiRuntimeConfigRepository;
+import com.mora.backend.repository.AiSettingsHistoryRepository;
 import com.mora.backend.service.AiSettingsService;
 import com.mora.backend.service.UserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -18,14 +24,20 @@ import javax.crypto.spec.GCMParameterSpec;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.SecureRandom;
-import java.time.LocalDateTime;
+import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Base64;
+import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.TreeSet;
 
 @Service @RequiredArgsConstructor
 public class AiSettingsServiceImpl implements AiSettingsService {
     private static final Long SINGLETON_ID = 1L;
+    private static final int HISTORY_PAGE_SIZE = 20;
     private final AiRuntimeConfigRepository repository;
+    private final AiSettingsHistoryRepository historyRepository;
     private final UserService users;
     // This project uses Jackson directly in several services; do not require a
     // framework-provided mapper bean, which is not available in this setup.
@@ -41,18 +53,27 @@ public class AiSettingsServiceImpl implements AiSettingsService {
     @Override @Transactional
     public SettingsView update(UpdateRequest request) {
         validate(request);
-        AiRuntimeConfig config = repository.findById(SINGLETON_ID).orElseGet(() -> AiRuntimeConfig.builder().id(SINGLETON_ID).build());
+        repository.lockSettingsUpdate();
+        AiRuntimeConfig existing = repository.findById(SINGLETON_ID).orElse(null);
+        SettingsView before = existing == null ? defaultView() : view(existing);
+        AiRuntimeConfig config = existing == null
+                ? AiRuntimeConfig.builder().id(SINGLETON_ID).build()
+                : existing.toBuilder().build();
         String submittedKey = request.apiKey() == null ? "" : request.apiKey().trim();
         if (!submittedKey.isBlank()) {
-            config.setEncryptedApiKey(encrypt(submittedKey));
-            config.setKeyFingerprint(fingerprint(submittedKey));
+            if (!sameKey(submittedKey, config.getEncryptedApiKey(), before.keyFingerprint())) {
+                config.setEncryptedApiKey(encrypt(submittedKey));
+                config.setKeyFingerprint(fingerprint(submittedKey));
+            }
         } else if (config.getEncryptedApiKey() == null) {
             throw new AppException(ErrorCode.INVALID_REQUEST_PARAMETER);
         }
         String submittedBenchmarkKey = request.benchmarkApiKey() == null ? "" : request.benchmarkApiKey().trim();
         if (!submittedBenchmarkKey.isBlank()) {
-            config.setEncryptedBenchmarkApiKey(encrypt(submittedBenchmarkKey));
-            config.setBenchmarkKeyFingerprint(fingerprint(submittedBenchmarkKey));
+            if (!sameKey(submittedBenchmarkKey, config.getEncryptedBenchmarkApiKey(), before.benchmarkKeyFingerprint())) {
+                config.setEncryptedBenchmarkApiKey(encrypt(submittedBenchmarkKey));
+                config.setBenchmarkKeyFingerprint(fingerprint(submittedBenchmarkKey));
+            }
         } else if (config.getEncryptedBenchmarkApiKey() == null) {
             throw new AppException(ErrorCode.INVALID_REQUEST_PARAMETER);
         }
@@ -65,8 +86,87 @@ public class AiSettingsServiceImpl implements AiSettingsService {
         config.setPricingVersion(request.pricingVersion().trim());
         try { config.setModelPricesJson(json.writeValueAsString(request.modelPrices())); }
         catch (Exception error) { throw new AppException(ErrorCode.INVALID_REQUEST_PARAMETER); }
-        config.setUpdatedById(users.getCurrentUser().getId());
-        return view(repository.save(config));
+        List<SettingsChange> changes = changesBetween(before, view(config));
+        addKeyChange(changes, ChangeGroup.CHAT, existing == null ? null : existing.getEncryptedApiKey(), config.getEncryptedApiKey());
+        addKeyChange(changes, ChangeGroup.BENCHMARK, existing == null ? null : existing.getEncryptedBenchmarkApiKey(), config.getEncryptedBenchmarkApiKey());
+        if (changes.isEmpty()) return before;
+
+        var actor = users.getCurrentUser();
+        config.setUpdatedById(actor.getId());
+        AiRuntimeConfig saved = repository.saveAndFlush(config);
+        try {
+            historyRepository.save(AiSettingsHistory.builder()
+                    .savedAt(Instant.now()).actorId(actor.getId()).actorName(actor.getFullName())
+                    .changesJson(json.writeValueAsString(changes)).build());
+        } catch (JsonProcessingException error) {
+            throw new AppException(ErrorCode.AI_ENGINE_ERROR);
+        }
+        return view(saved);
+    }
+
+    @Override @Transactional(readOnly = true)
+    public PageResponse<HistoryEntry> history(int page) {
+        if (page < 0) throw new AppException(ErrorCode.INVALID_REQUEST_PARAMETER);
+        var result = historyRepository.findAll(PageRequest.of(page, HISTORY_PAGE_SIZE, Sort.by(Sort.Direction.DESC, "id")));
+        return new PageResponse<>(result.map(this::historyEntry).getContent(),
+                new PageResponse.Meta(new PageResponse.Pagination(result.getTotalElements(), page, HISTORY_PAGE_SIZE)));
+    }
+
+    private HistoryEntry historyEntry(AiSettingsHistory entry) {
+        try {
+            List<SettingsChange> changes = json.readValue(entry.getChangesJson(), new TypeReference<>() {});
+            return new HistoryEntry(entry.getId(), entry.getSavedAt(), entry.getActorId(), entry.getActorName(), changes);
+        } catch (JsonProcessingException error) {
+            throw new AppException(ErrorCode.AI_ENGINE_ERROR);
+        }
+    }
+
+    private List<SettingsChange> changesBetween(SettingsView before, SettingsView after) {
+        List<SettingsChange> changes = new ArrayList<>();
+        addChange(changes, ChangeGroup.CHAT, "chatModel", null, before.chatModel(), after.chatModel());
+        addChange(changes, ChangeGroup.CHAT, "parserModel", null, before.parserModel(), after.parserModel());
+        addChange(changes, ChangeGroup.CHAT, "embeddingModel", null, before.embeddingModel(), after.embeddingModel());
+        addChange(changes, ChangeGroup.BENCHMARK, "benchmarkJudgeModel", null, before.benchmarkJudgeModel(), after.benchmarkJudgeModel());
+        addChange(changes, ChangeGroup.BENCHMARK, "benchmarkJudgeEmbeddingModel", null, before.benchmarkJudgeEmbeddingModel(), after.benchmarkJudgeEmbeddingModel());
+        addChange(changes, ChangeGroup.PRICING, "vndPerUsd", null, before.vndPerUsd(), after.vndPerUsd());
+        addChange(changes, ChangeGroup.PRICING, "pricingVersion", null, before.pricingVersion(), after.pricingVersion());
+
+        var models = new TreeSet<>(before.modelPrices().keySet());
+        models.addAll(after.modelPrices().keySet());
+        for (String model : models) {
+            ModelPrice oldPrice = before.modelPrices().get(model);
+            ModelPrice newPrice = after.modelPrices().get(model);
+            addChange(changes, ChangeGroup.PRICING, "modelPrice", model, oldPrice, newPrice);
+        }
+        return changes;
+    }
+
+    private void addKeyChange(List<SettingsChange> changes, ChangeGroup group, String before, String after) {
+        if (!Objects.equals(before, after)) {
+            changes.add(new SettingsChange(group, "apiKey", null, null, before == null ? "configured" : "changed"));
+        }
+    }
+
+    private boolean sameKey(String submittedKey, String encryptedKey, String currentFingerprint) {
+        if (encryptedKey == null || !fingerprint(submittedKey).equals(currentFingerprint)) return false;
+        try {
+            return submittedKey.equals(decrypt(encryptedKey));
+        } catch (AppException unreadableKey) {
+            return false;
+        }
+    }
+
+    private void addChange(List<SettingsChange> changes, ChangeGroup group, String field, String model, Object before, Object after) {
+        if (!Objects.equals(before, after)) {
+            changes.add(new SettingsChange(group, field, model, historyValue(before), historyValue(after)));
+        }
+    }
+
+    private String historyValue(Object value) {
+        if (value instanceof ModelPrice price) {
+            return "%s / %s / %s".formatted(price.inputPerMillionUsd(), price.cachedInputPerMillionUsd(), price.outputPerMillionUsd());
+        }
+        return Objects.toString(value, null);
     }
 
     @Override @Transactional(readOnly = true)
