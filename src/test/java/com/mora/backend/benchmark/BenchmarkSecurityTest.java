@@ -8,7 +8,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.User;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -30,12 +29,12 @@ class BenchmarkSecurityTest {
     @BeforeEach void setup() { mvc=MockMvcBuilders.webAppContextSetup(context).addFilters(chain).build(); }
     @MockitoBean BenchmarkService service;
     @MockitoBean JwtTokenProvider jwt;
-    @MockitoBean UserDetailsService userDetails;
+    @MockitoBean CustomUserDetailsService userDetails;
     @Test void anonymousRejected() throws Exception { mvc.perform(get("/api/admin/benchmarks/datasets")).andExpect(status().isUnauthorized()); }
     private void authenticate(String role) {
         var user=User.withUsername("fixture").password("unused").authorities(role).build();
-        when(jwt.extractUsername("test-token")).thenReturn("fixture");
-        when(userDetails.loadUserByUsername("fixture")).thenReturn(user);
+        when(jwt.extractUserId("test-token")).thenReturn("fixture");
+        when(userDetails.loadById("fixture")).thenReturn(user);
         when(jwt.isTokenValid("test-token",user)).thenReturn(true);
     }
     @Test void memberRejected() throws Exception {
