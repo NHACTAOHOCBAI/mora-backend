@@ -7,13 +7,18 @@ import org.springframework.http.*;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
+import com.mora.backend.service.AiUsageService;
+import com.fasterxml.jackson.core.type.TypeReference;
+import java.util.List;
 
 @Component
 public class BenchmarkAiClient {
     @Value("${ai-service.url:http://localhost:8000}") private String baseUrl;
     private final ObjectMapper json = new ObjectMapper();
     private final RestTemplate http;
-    public BenchmarkAiClient() {
+    private final AiUsageService usage;
+    public BenchmarkAiClient(AiUsageService usage) {
+        this.usage = usage;
         var factory = new SimpleClientHttpRequestFactory();
         factory.setConnectTimeout(10000);
         factory.setReadTimeout(600000);
@@ -26,7 +31,9 @@ public class BenchmarkAiClient {
             var response = http.exchange(baseUrl + "/api/internal/benchmarks/" + action,
                     body == null ? HttpMethod.GET : HttpMethod.POST,
                     new HttpEntity<>(body == null ? null : json.writeValueAsString(body), headers), String.class);
-            return json.readTree(response.getBody());
+            JsonNode result = json.readTree(response.getBody());
+            record(result, null, null);
+            return result;
         } catch (Exception e) {
             // Provider bodies and credentials must never reach persisted benchmark errors.
             throw new IllegalStateException("AI benchmark request failed: " + e.getClass().getSimpleName());
@@ -40,7 +47,14 @@ public class BenchmarkAiClient {
         });
         try {
             var response=http.postForObject(baseUrl+"/api/internal/benchmarks/parse",new HttpEntity<>(body,headers),String.class);
-            return json.readTree(response);
+            JsonNode result = json.readTree(response);
+            record(result, null, null);
+            return result;
         } catch(Exception e) { throw new IllegalStateException("Benchmark PDF parsing failed: "+e.getClass().getSimpleName()); }
+    }
+    private void record(JsonNode result, Long spaceId, Long documentId) {
+        if (result == null || !result.path("usage").isArray()) return;
+        try { usage.record(json.convertValue(result.path("usage"), new TypeReference<List<AiUsageService.UsageItem>>() {}), spaceId, documentId); }
+        catch (IllegalArgumentException ignored) { }
     }
 }

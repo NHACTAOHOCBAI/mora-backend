@@ -13,6 +13,8 @@ import com.mora.backend.repository.DocumentRepository;
 import com.mora.backend.repository.SpaceMemberRepository;
 import com.mora.backend.repository.SpaceRepository;
 import com.mora.backend.repository.UserRepository;
+import com.mora.backend.repository.AiUsageEventRepository;
+import com.mora.backend.model.entity.AiUsageEvent;
 import com.mora.backend.service.AdminOperationsService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -31,6 +33,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import java.math.BigDecimal;
 
 @Service
 @RequiredArgsConstructor
@@ -40,6 +43,7 @@ public class AdminOperationsServiceImpl implements AdminOperationsService {
     private final SpaceRepository spaces;
     private final DocumentRepository documents;
     private final SpaceMemberRepository members;
+    private final AiUsageEventRepository aiUsage;
 
     @Override
     public AdminOperationsResponses.Dashboard dashboard(int rangeDays) {
@@ -68,9 +72,10 @@ public class AdminOperationsServiceImpl implements AdminOperationsService {
                 .limit(5).map(this::spaceSummary).toList();
         long attention = statuses.get(DocumentStatus.FAILED) + statuses.get(DocumentStatus.UPLOADING)
                 + statuses.get(DocumentStatus.PARSING) + statuses.get(DocumentStatus.INDEXING);
+        AdminOperationsResponses.AiUsageSummary usage = usageSummary(start, days);
         return AdminOperationsResponses.Dashboard.builder().rangeDays(days).totalUsers(allUsers.size())
                 .totalSpaces(allSpaces.size()).totalDocuments(allDocuments.size()).documentsNeedingAttention(attention)
-                .activity(activity).documentStatusCounts(statuses).failedDocuments(failed).recentSpaces(recent).build();
+                .activity(activity).documentStatusCounts(statuses).failedDocuments(failed).recentSpaces(recent).aiUsage(usage).build();
     }
 
     @Override
@@ -137,6 +142,31 @@ public class AdminOperationsServiceImpl implements AdminOperationsService {
         return new PageResponse<>(source.getContent(), new PageResponse.Meta(new PageResponse.Pagination(source.getTotalElements(), page, limit)));
     }
     private int normalizeRange(int rangeDays) { return rangeDays == 7 || rangeDays == 90 ? rangeDays : 30; }
+
+    private AdminOperationsResponses.AiUsageSummary usageSummary(LocalDate start, int days) {
+        LocalDateTime from = start.atStartOfDay();
+        List<AiUsageEvent> events = aiUsage.findByCreatedAtGreaterThanEqualOrderByCreatedAtAsc(from);
+        Map<LocalDate, List<AiUsageEvent>> byDay = events.stream().filter(event -> event.getCreatedAt() != null)
+                .collect(Collectors.groupingBy(event -> event.getCreatedAt().toLocalDate()));
+        List<AdminOperationsResponses.DailyAiUsage> daily = new ArrayList<>();
+        for (int offset = 0; offset < days; offset++) {
+            LocalDate date = start.plusDays(offset); List<AiUsageEvent> values = byDay.getOrDefault(date, List.of());
+            daily.add(AdminOperationsResponses.DailyAiUsage.builder().date(date).totalTokens(values.stream().mapToLong(AiUsageEvent::getTotalTokens).sum())
+                    .costVnd(sumCost(values)).requestCount(values.size()).build());
+        }
+        return AdminOperationsResponses.AiUsageSummary.builder().totalTokens(events.stream().mapToLong(AiUsageEvent::getTotalTokens).sum())
+                .totalCostVnd(sumCost(events)).requestCount(events.size())
+                .trackingStartedAt(aiUsage.findFirstByOrderByCreatedAtAsc().map(AiUsageEvent::getCreatedAt).orElse(null))
+                .daily(daily).byOperation(breakdown(events, true)).byModel(breakdown(events, false)).build();
+    }
+
+    private List<AdminOperationsResponses.AiUsageBreakdown> breakdown(List<AiUsageEvent> events, boolean operation) {
+        Map<String, List<AiUsageEvent>> grouped = events.stream().collect(Collectors.groupingBy(event -> operation ? event.getOperation() : event.getModel()));
+        return grouped.entrySet().stream().map(entry -> AdminOperationsResponses.AiUsageBreakdown.builder().key(entry.getKey())
+                .totalTokens(entry.getValue().stream().mapToLong(AiUsageEvent::getTotalTokens).sum()).costVnd(sumCost(entry.getValue()))
+                .requestCount(entry.getValue().size()).build()).sorted(Comparator.comparing(AdminOperationsResponses.AiUsageBreakdown::getCostVnd).reversed()).toList();
+    }
+    private BigDecimal sumCost(List<AiUsageEvent> events) { return events.stream().map(AiUsageEvent::getEstimatedCostVnd).filter(java.util.Objects::nonNull).reduce(BigDecimal.ZERO, BigDecimal::add); }
     private long countCreated(List<? extends Object> records, LocalDate date) {
         return records.stream().filter(record -> {
             LocalDateTime created = record instanceof User user ? user.getCreatedAt() : record instanceof Space space ? space.getCreatedAt() : ((Document) record).getCreatedAt();

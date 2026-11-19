@@ -12,6 +12,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
+import java.math.BigDecimal;
 
 public final class AdminOperationsResponses {
     private AdminOperationsResponses() {}
@@ -27,6 +28,7 @@ public final class AdminOperationsResponses {
         private Map<DocumentStatus, Long> documentStatusCounts;
         private List<DocumentSummary> failedDocuments;
         private List<SpaceSummary> recentSpaces;
+        private AiUsageSummary aiUsage;
     }
 
     @Data @Builder @NoArgsConstructor @AllArgsConstructor
@@ -35,6 +37,27 @@ public final class AdminOperationsResponses {
         private long users;
         private long spaces;
         private long documents;
+    }
+
+    @Data @Builder @NoArgsConstructor @AllArgsConstructor
+    public static class AiUsageSummary {
+        private long totalTokens;
+        private BigDecimal totalCostVnd;
+        private long requestCount;
+        private LocalDateTime trackingStartedAt;
+        private List<DailyAiUsage> daily;
+        private List<AiUsageBreakdown> byOperation;
+        private List<AiUsageBreakdown> byModel;
+    }
+
+    @Data @Builder @NoArgsConstructor @AllArgsConstructor
+    public static class DailyAiUsage {
+        private LocalDate date; private long totalTokens; private BigDecimal costVnd; private long requestCount;
+    }
+
+    @Data @Builder @NoArgsConstructor @AllArgsConstructor
+    public static class AiUsageBreakdown {
+        private String key; private long totalTokens; private BigDecimal costVnd; private long requestCount;
     }
 
     @Data @Builder @NoArgsConstructor @AllArgsConstructor

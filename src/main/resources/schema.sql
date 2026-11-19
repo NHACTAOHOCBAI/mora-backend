@@ -150,3 +150,20 @@ ALTER TABLE space_invitations DROP COLUMN IF EXISTS invite_email;
 -- Debug-only AI prompt data must never persist or be exposed to users.
 ALTER TABLE chat_messages DROP COLUMN IF EXISTS condensed_question;
 ALTER TABLE chat_messages DROP COLUMN IF EXISTS prompt_sent;
+
+CREATE TABLE IF NOT EXISTS ai_usage_events (
+    id BIGSERIAL PRIMARY KEY,
+    operation VARCHAR(64) NOT NULL,
+    model VARCHAR(128) NOT NULL,
+    input_tokens BIGINT NOT NULL DEFAULT 0,
+    output_tokens BIGINT NOT NULL DEFAULT 0,
+    cached_input_tokens BIGINT NOT NULL DEFAULT 0,
+    total_tokens BIGINT NOT NULL DEFAULT 0,
+    estimated_cost_vnd NUMERIC(18, 2) NOT NULL DEFAULT 0,
+    pricing_version VARCHAR(32),
+    space_id BIGINT,
+    document_id BIGINT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_ai_usage_created_at ON ai_usage_events (created_at);
+CREATE INDEX IF NOT EXISTS idx_ai_usage_operation ON ai_usage_events (operation);

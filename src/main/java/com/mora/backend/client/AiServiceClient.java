@@ -10,11 +10,14 @@ import org.springframework.web.client.RestTemplate;
 import java.util.List;
 import java.util.Map;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.mora.backend.service.AiUsageService;
 
 @Component
 @Slf4j
 @RequiredArgsConstructor
 public class AiServiceClient {
+
+    private final AiUsageService usage;
 
     private final RestTemplate restTemplate = createRestTemplate();
 
@@ -57,6 +60,7 @@ public class AiServiceClient {
     public static class PythonChatResponse {
         public String answer;
         public List<Citation> citations;
+        public List<AiUsageService.UsageItem> usage;
 
         public static class Citation {
             public int pageNumber;
@@ -69,7 +73,9 @@ public class AiServiceClient {
     public PythonChatResponse callChat(PythonChatRequest request) {
         String url = aiServiceUrl + "/api/chat";
         try {
-            return restTemplate.postForObject(url, request, PythonChatResponse.class);
+            PythonChatResponse response = restTemplate.postForObject(url, request, PythonChatResponse.class);
+            if (response != null) usage.record(response.usage, request.spaceId, request.documentId);
+            return response;
         } catch (org.springframework.web.client.HttpStatusCodeException e) {
             log.error("Failed to call Python AI service /api/chat. Error response: {}", e.getResponseBodyAsString(), e);
             throw new AppException(ErrorCode.AI_ENGINE_ERROR);
@@ -88,12 +94,15 @@ public class AiServiceClient {
 
     public static class PythonSummarizeResponse {
         public String summary;
+        public List<AiUsageService.UsageItem> usage;
     }
 
     public PythonSummarizeResponse callSummarize(PythonSummarizeRequest request) {
         String url = aiServiceUrl + "/api/chat/summarize";
         try {
-            return restTemplate.postForObject(url, request, PythonSummarizeResponse.class);
+            PythonSummarizeResponse response = restTemplate.postForObject(url, request, PythonSummarizeResponse.class);
+            if (response != null) usage.record(response.usage, null, null);
+            return response;
         } catch (org.springframework.web.client.HttpStatusCodeException e) {
             log.error("Failed to call Python AI service /api/chat/summarize. Error response: {}", e.getResponseBodyAsString(), e);
             throw new AppException(ErrorCode.AI_ENGINE_ERROR);
@@ -111,6 +120,7 @@ public class AiServiceClient {
     public static class PythonParseResponse {
         public String status;
         public List<PythonPageResponse> pages;
+        public List<AiUsageService.UsageItem> usage;
     }
 
     public List<PythonPageResponse> parsePdf(byte[] pdfBytes, String fileName) {
@@ -134,6 +144,7 @@ public class AiServiceClient {
         try {
             PythonParseResponse response = restTemplate.postForObject(url, requestEntity, PythonParseResponse.class);
             if (response != null && "success".equalsIgnoreCase(response.status)) {
+                usage.record(response.usage, null, null);
                 return response.pages;
             }
             throw new AppException(ErrorCode.PDF_PROCESSING_FAILED);
@@ -162,7 +173,8 @@ public class AiServiceClient {
         request.put("pages", pagesPayload);
 
         try {
-            restTemplate.postForObject(url, request, Void.class);
+            PythonIndexResponse response = restTemplate.postForObject(url, request, PythonIndexResponse.class);
+            if (response != null) usage.record(response.usage, spaceId, documentId);
             log.info("Successfully requested Python AI service to index document ID: {}", documentId);
         } catch (Exception e) {
             log.error("Failed to request Python AI service to index document ID: {}", documentId, e);
@@ -181,6 +193,7 @@ public class AiServiceClient {
         public String title;
         public List<StudyFlashcard> flashcards;
         public List<StudyQuizQuestion> quizQuestions;
+        public List<AiUsageService.UsageItem> usage;
         public static class StudyCitation { public Long documentId; public String documentName; public Integer pageNumber; public String quote; }
         public static class StudyFlashcard { public String front; public String back; public StudyCitation citation; }
         public static class StudyQuizQuestion { public String question; public List<String> options; public Integer correctOptionIndex; public String explanation; public StudyCitation citation; }
@@ -188,10 +201,14 @@ public class AiServiceClient {
 
     public PythonStudyGenerateResponse generateStudySet(PythonStudyGenerateRequest request) {
         try {
-            return restTemplate.postForObject(aiServiceUrl + "/api/study/generate", request, PythonStudyGenerateResponse.class);
+            PythonStudyGenerateResponse response = restTemplate.postForObject(aiServiceUrl + "/api/study/generate", request, PythonStudyGenerateResponse.class);
+            if (response != null) usage.record(response.usage, request.spaceId, null);
+            return response;
         } catch (Exception e) {
             log.error("Failed to generate study set through Python AI service", e);
             throw new AppException(ErrorCode.AI_ENGINE_ERROR);
         }
     }
+
+    public static class PythonIndexResponse { public String status; public List<AiUsageService.UsageItem> usage; }
 }
