@@ -1,5 +1,7 @@
 # Mora Backend
 
+Benchmark RAG v1: [hướng dẫn chạy](../mora-ai/benchmarks/README.md), giao diện admin tại `/admin/benchmarks`.
+
 Backend Spring Boot của Mora. Service này cung cấp REST API, xác thực JWT, WebSocket thời gian thực và điều phối dữ liệu giữa web client, PostgreSQL, lưu trữ tệp và AI Service.
 
 ## Kiến trúc hệ thống
