@@ -10,6 +10,7 @@ import org.springframework.web.client.RestTemplate;
 import java.util.List;
 import java.util.Map;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mora.backend.service.AiUsageService;
@@ -110,7 +111,12 @@ public class AiServiceClient {
                                 if (line.startsWith("event:")) event = line.substring(6).trim();
                                 else if (line.startsWith("data:")) data = line.substring(5).trim();
                                 else if (line.isBlank() && data != null) {
-                                    consumer.accept(new StreamEvent(event, mapper.readTree(data)));
+                                    JsonNode payloadNode = mapper.readTree(data);
+                                    if ("usage".equals(event)) {
+                                        recordStreamUsage(payloadNode, mapper, payload);
+                                    } else {
+                                        consumer.accept(new StreamEvent(event, payloadNode));
+                                    }
                                     event = "message"; data = null;
                                 }
                             }
@@ -122,6 +128,18 @@ public class AiServiceClient {
                 log.error("Failed to stream Python AI service", e);
                 throw new AppException(ErrorCode.AI_ENGINE_ERROR);
             }
+        }
+    }
+
+    private void recordStreamUsage(JsonNode payload, ObjectMapper mapper, PythonChatRequest request) {
+        if (!payload.path("usage").isArray()) return;
+        try {
+            List<AiUsageService.UsageItem> items = mapper.convertValue(payload.path("usage"),
+                    new TypeReference<List<AiUsageService.UsageItem>>() {});
+            log.info("Recording {} streaming AI usage event(s) for space {}", items.size(), request.spaceId);
+            usage.record(items, request.spaceId, request.documentId);
+        } catch (IllegalArgumentException error) {
+            log.warn("Ignoring malformed streaming usage payload");
         }
     }
 
