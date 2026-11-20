@@ -5,6 +5,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mora.backend.exception.AppException;
 import com.mora.backend.exception.ErrorCode;
+import com.mora.backend.client.AiServiceClient;
 import com.mora.backend.model.dto.response.PageResponse;
 import com.mora.backend.model.entity.AiRuntimeConfig;
 import com.mora.backend.model.entity.AiSettingsHistory;
@@ -39,6 +40,7 @@ public class AiSettingsServiceImpl implements AiSettingsService {
     private final AiRuntimeConfigRepository repository;
     private final AiSettingsHistoryRepository historyRepository;
     private final UserService users;
+    private final AiServiceClient aiServiceClient;
     // This project uses Jackson directly in several services; do not require a
     // framework-provided mapper bean, which is not available in this setup.
     private final ObjectMapper json = new ObjectMapper();
@@ -110,6 +112,14 @@ public class AiSettingsServiceImpl implements AiSettingsService {
         var result = historyRepository.findAll(PageRequest.of(page, HISTORY_PAGE_SIZE, Sort.by(Sort.Direction.DESC, "id")));
         return new PageResponse<>(result.map(this::historyEntry).getContent(),
                 new PageResponse.Meta(new PageResponse.Pagination(result.getTotalElements(), page, HISTORY_PAGE_SIZE)));
+    }
+
+    @Override @Transactional(readOnly = true)
+    public ValidationResult validate() {
+        var result = aiServiceClient.validateConfiguration();
+        List<ValidationCheck> checks = result.checks == null ? List.of() : result.checks.stream()
+                .map(check -> new ValidationCheck(check.name, check.valid, check.message)).toList();
+        return new ValidationResult(result.valid && !checks.isEmpty(), checks);
     }
 
     private HistoryEntry historyEntry(AiSettingsHistory entry) {

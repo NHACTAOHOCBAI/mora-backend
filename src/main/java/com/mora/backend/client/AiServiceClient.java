@@ -95,6 +95,30 @@ public class AiServiceClient {
         }
     }
 
+    public static class PythonConfigValidationResponse {
+        public boolean valid;
+        public List<Check> checks;
+        public static class Check { public String name; public boolean valid; public String message; }
+    }
+
+    public PythonConfigValidationResponse validateConfiguration() {
+        try {
+            PythonConfigValidationResponse response = restTemplate.postForObject(
+                    aiServiceUrl + "/api/config/validate", null, PythonConfigValidationResponse.class);
+            if (response != null) return response;
+        } catch (Exception error) {
+            log.warn("Could not validate AI configuration through AI service", error);
+        }
+        PythonConfigValidationResponse unavailable = new PythonConfigValidationResponse();
+        unavailable.valid = false;
+        PythonConfigValidationResponse.Check check = new PythonConfigValidationResponse.Check();
+        check.name = "Kết nối Mora";
+        check.valid = false;
+        check.message = "Không thể kết nối AI service để kiểm tra cấu hình.";
+        unavailable.checks = List.of(check);
+        return unavailable;
+    }
+
     public record StreamEvent(String name, JsonNode payload) {}
 
     /** Proxy Python SSE without buffering the generated answer. */

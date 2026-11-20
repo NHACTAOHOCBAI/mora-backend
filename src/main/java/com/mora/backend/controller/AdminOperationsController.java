@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.PostMapping;
 
 @RestController
 @RequestMapping("/api/admin")
@@ -25,6 +26,7 @@ public class AdminOperationsController {
 
     @GetMapping("/ai-settings") public ResponseEntity<ApiResponse<AiSettingsService.SettingsView>> aiSettings() { return ok(aiSettings.get()); }
     @PutMapping("/ai-settings") public ResponseEntity<ApiResponse<AiSettingsService.SettingsView>> updateAiSettings(@RequestBody AiSettingsService.UpdateRequest request) { return ok(aiSettings.update(request)); }
+    @PostMapping("/ai-settings/validate") public ResponseEntity<ApiResponse<AiSettingsService.ValidationResult>> validateAiSettings() { return ok(aiSettings.validate()); }
 
     @GetMapping("/ai-settings/history")
     public ResponseEntity<ApiResponse<PageResponse<AiSettingsService.HistoryEntry>>> aiSettingsHistory(

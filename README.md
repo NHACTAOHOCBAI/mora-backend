@@ -116,7 +116,7 @@ DB_USERNAME=postgres
 DB_PASSWORD=postgres
 ```
 
-Các biến tùy chọn gồm `PORT` (mặc định `8080`), `AI_SERVICE_URL` (mặc định `http://localhost:8000`) và cấu hình R2: `R2_ENDPOINT`, `R2_ACCESS_KEY`, `R2_SECRET_KEY`, `R2_BUCKET`, `R2_PUBLIC_URL`. Không commit `.env`.
+AI cần thêm `AI_SETTINGS_ENCRYPTION_KEY` và `AI_SERVICE_INTERNAL_KEY`; key nội bộ này phải trùng với `mora-ai/.env`. Các biến tùy chọn gồm `PORT` (mặc định `8080`), `AI_SERVICE_URL` (mặc định `http://localhost:8000`) và cấu hình R2: `R2_ENDPOINT`, `R2_ACCESS_KEY`, `R2_SECRET_KEY`, `R2_BUCKET`, `R2_PUBLIC_URL`. Không commit `.env`.
 
 Các nhóm cấu hình còn lại trong `.env.example` gồm `CORS_ALLOWED_ORIGINS`, `JWT_SECRET`, `JWT_EXPIRATION_MS`, seed admin local (`MORA_ADMIN_*`) và SMTP/khôi phục mật khẩu (`PASSWORD_RECOVERY_*`, `MAIL_*`). `JWT_SECRET` phải dài tối thiểu 32 byte.
 

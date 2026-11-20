@@ -23,8 +23,11 @@ public interface AiSettingsService {
     record RuntimeConfig(String apiKey, String benchmarkApiKey, String chatModel, String parserModel, String embeddingModel,
                          String benchmarkJudgeModel, String benchmarkJudgeEmbeddingModel,
                          double vndPerUsd, String pricingVersion, Map<String, ModelPrice> modelPrices) {}
+    record ValidationCheck(String name, boolean valid, String message) {}
+    record ValidationResult(boolean valid, List<ValidationCheck> checks) {}
     SettingsView get();
     SettingsView update(UpdateRequest request);
     PageResponse<HistoryEntry> history(int page);
     RuntimeConfig runtime();
+    ValidationResult validate();
 }
