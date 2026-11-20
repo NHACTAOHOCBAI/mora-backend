@@ -126,6 +126,12 @@ ALTER TABLE users DROP COLUMN IF EXISTS username;
 
 -- Preserve existing sessions until an account actually resets its password.
 ALTER TABLE users ADD COLUMN IF NOT EXISTS credential_version BIGINT NOT NULL DEFAULT 0;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS plan_tier VARCHAR(20) NOT NULL DEFAULT 'FREE';
+ALTER TABLE users ADD COLUMN IF NOT EXISTS scheduled_plan_tier VARCHAR(20);
+ALTER TABLE users ADD COLUMN IF NOT EXISTS plan_period_started_at TIMESTAMP;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS plan_period_ends_at TIMESTAMP;
+UPDATE users SET plan_period_started_at = COALESCE(plan_period_started_at, created_at, CURRENT_TIMESTAMP),
+  plan_period_ends_at = COALESCE(plan_period_ends_at, COALESCE(created_at, CURRENT_TIMESTAMP) + INTERVAL '1 month');
 
 -- Legal consent for the published Terms of Use and Privacy Policy.
 ALTER TABLE users ADD COLUMN IF NOT EXISTS terms_accepted_version VARCHAR(20);
@@ -167,3 +173,10 @@ CREATE TABLE IF NOT EXISTS ai_usage_events (
 );
 CREATE INDEX IF NOT EXISTS idx_ai_usage_created_at ON ai_usage_events (created_at);
 CREATE INDEX IF NOT EXISTS idx_ai_usage_operation ON ai_usage_events (operation);
+ALTER TABLE ai_usage_events ADD COLUMN IF NOT EXISTS user_id BIGINT;
+CREATE INDEX IF NOT EXISTS idx_ai_usage_user_created_at ON ai_usage_events (user_id, created_at);
+
+CREATE TABLE IF NOT EXISTS plan_change_history (
+    id BIGSERIAL PRIMARY KEY, user_id BIGINT NOT NULL, from_plan VARCHAR(20),
+    to_plan VARCHAR(20) NOT NULL, source VARCHAR(30) NOT NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);

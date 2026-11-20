@@ -24,11 +24,13 @@ public class StudySetServiceImpl implements StudySetService {
     private final DocumentPageRepository documentPages;
     private final AiServiceClient ai;
     private final UserService users;
+    private final BillingService billing;
     private final ObjectMapper mapper = new ObjectMapper();
 
     @Override @Transactional
     public StudySetResponse create(Long spaceId, CreateStudySetRequest request) {
         Space space = requireMember(spaceId);
+        if (billing != null) billing.requireCanUseAi(space);
         if (!Set.of(5, 10, 15).contains(request.getCardCount())) throw new AppException(ErrorCode.INVALID_REQUEST_PARAMETER);
         List<Long> ids = request.getDocumentIds().stream().distinct().toList();
         List<Document> selected = documents.findAllById(ids);

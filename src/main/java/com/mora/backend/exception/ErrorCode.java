@@ -39,7 +39,10 @@ public enum ErrorCode {
     MISSING_REQUEST_DATA(1029, "Thiếu thông tin bắt buộc", HttpStatus.BAD_REQUEST),
     INVALID_REQUEST_PARAMETER(1030, "Tham số yêu cầu không hợp lệ", HttpStatus.BAD_REQUEST),
     BENCHMARK_RUN_NOT_FOUND(1031, "Không tìm thấy lượt chạy Benchmark", HttpStatus.NOT_FOUND),
-    BENCHMARK_RUN_NOT_DELETABLE(1032, "Chỉ có thể xóa lượt chạy đã hoàn tất hoặc bị gián đoạn", HttpStatus.CONFLICT)
+    BENCHMARK_RUN_NOT_DELETABLE(1032, "Chỉ có thể xóa lượt chạy đã hoàn tất hoặc bị gián đoạn", HttpStatus.CONFLICT),
+    SPACE_QUOTA_EXCEEDED(1044, "Gói hiện tại đã đạt giới hạn số Space. Vui lòng nâng cấp gói.", HttpStatus.CONFLICT),
+    AI_TOKEN_QUOTA_EXCEEDED(1045, "Gói hiện tại đã dùng hết quota token AI. Vui lòng nâng cấp gói hoặc chờ chu kỳ mới.", HttpStatus.TOO_MANY_REQUESTS),
+    PLAN_DOWNGRADE_BLOCKED(1046, "Bạn đang sở hữu nhiều Space hơn giới hạn của gói muốn hạ.", HttpStatus.CONFLICT)
     ;
 
     private final int code;

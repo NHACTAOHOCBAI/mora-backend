@@ -21,5 +21,6 @@ public class AiUsageEvent {
     @Column(length = 32) private String pricingVersion;
     @Column(name = "space_id") private Long spaceId;
     @Column(name = "document_id") private Long documentId;
+    @Column(name = "user_id") private Long userId;
     @CreationTimestamp @Column(name = "created_at", updatable = false) private LocalDateTime createdAt;
 }

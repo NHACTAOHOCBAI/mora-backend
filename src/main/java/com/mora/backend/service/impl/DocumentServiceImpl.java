@@ -32,6 +32,7 @@ public class DocumentServiceImpl implements DocumentService {
     private final StorageService storageService;
     private final DocumentAsyncProcessor documentAsyncProcessor;
     private final UserService userService;
+    private final com.mora.backend.service.BillingService billingService;
 
     @Override
     @Transactional
@@ -42,6 +43,7 @@ public class DocumentServiceImpl implements DocumentService {
 
         Space space = spaceRepository.findById(spaceId)
                 .orElseThrow(() -> new AppException(ErrorCode.SPACE_NOT_FOUND));
+        if (billingService != null) billingService.requireCanUseAi(space);
 
         SpaceRole userRole = getUserRole(space, currentUser);
         if (currentUser.getRole() != Role.ROLE_ADMIN && (userRole == null || userRole == SpaceRole.VIEWER)) {

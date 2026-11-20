@@ -23,6 +23,7 @@ public interface SpaceRepository extends JpaRepository<Space, Long> {
     List<Space> findAllAccessibleSpaces(@Param("user") User user);
 
     boolean existsByIdAndUserId(Long id, Long userId);
+    long countByUserId(Long userId);
 
     @Query("SELECT s FROM Space s WHERE :search IS NULL OR :search = '' OR " +
             "LOWER(s.name) LIKE LOWER(CONCAT('%', :search, '%')) OR " +

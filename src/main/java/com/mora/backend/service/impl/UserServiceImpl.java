@@ -293,6 +293,7 @@ public class UserServiceImpl implements UserService {
                 .privacyAcceptedVersion(user.getPrivacyAcceptedVersion())
                 .privacyAcceptedAt(user.getPrivacyAcceptedAt())
                 .legalAcceptanceRequired(requiresLegalAcceptance(user))
+                .planTier(user.getPlanTier())
                 .build();
     }
 

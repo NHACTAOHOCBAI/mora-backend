@@ -51,6 +51,21 @@ public class User {
     @org.hibernate.annotations.ColumnDefault("0")
     private long credentialVersion;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "plan_tier", nullable = false, length = 20)
+    @Builder.Default
+    private PlanTier planTier = PlanTier.FREE;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "scheduled_plan_tier", length = 20)
+    private PlanTier scheduledPlanTier;
+
+    @Column(name = "plan_period_started_at")
+    private LocalDateTime planPeriodStartedAt;
+
+    @Column(name = "plan_period_ends_at")
+    private LocalDateTime planPeriodEndsAt;
+
     @Column(name = "terms_accepted_version", length = 20)
     private String termsAcceptedVersion;
 

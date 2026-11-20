@@ -1,6 +1,7 @@
 package com.mora.backend.model.dto.response;
 
 import com.mora.backend.model.entity.Role;
+import com.mora.backend.model.entity.PlanTier;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -26,4 +27,5 @@ public class UserResponse {
     private String privacyAcceptedVersion;
     private LocalDateTime privacyAcceptedAt;
     private boolean legalAcceptanceRequired;
+    private PlanTier planTier;
 }

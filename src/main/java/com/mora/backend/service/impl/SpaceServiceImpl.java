@@ -39,11 +39,14 @@ public class SpaceServiceImpl implements SpaceService {
     private final UserRepository userRepository;
     private final DocumentRepository documentRepository;
     private final DocumentService documentService;
+    private final org.springframework.beans.factory.ObjectProvider<com.mora.backend.service.BillingService> billingService;
 
     @Override
     @Transactional
     public SpaceResponse createSpace(SpaceCreateRequest request) {
         User currentUser = userService.getCurrentUser();
+        var billing = billingService.getIfAvailable();
+        if (billing != null) billing.requireCanCreateSpace(currentUser);
         Space space = Space.builder()
                 .name(request.getName())
                 .description(request.getDescription())

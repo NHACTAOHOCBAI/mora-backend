@@ -4,6 +4,12 @@ import com.mora.backend.model.dto.request.AdminUserUpdateRequest;
 import com.mora.backend.model.dto.response.ApiResponse;
 import com.mora.backend.model.dto.response.UserResponse;
 import com.mora.backend.service.UserService;
+import com.mora.backend.service.BillingService;
+import com.mora.backend.repository.UserRepository;
+import com.mora.backend.model.dto.request.PlanChangeRequest;
+import com.mora.backend.model.dto.response.EntitlementResponse;
+import com.mora.backend.exception.AppException;
+import com.mora.backend.exception.ErrorCode;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -17,6 +23,8 @@ import com.mora.backend.model.dto.response.PageResponse;
 public class AdminUserController {
 
     private final UserService userService;
+    private final BillingService billingService;
+    private final UserRepository userRepository;
 
     @GetMapping
     public ResponseEntity<ApiResponse<PageResponse<UserResponse>>> getAllUsers(
@@ -47,6 +55,12 @@ public class AdminUserController {
                         .result(response)
                         .build()
         );
+    }
+
+    @PatchMapping("/{id}/plan")
+    public ResponseEntity<ApiResponse<EntitlementResponse>> updatePlan(@PathVariable Long id, @Valid @RequestBody PlanChangeRequest request) {
+        var user = userRepository.findById(id).orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+        return ResponseEntity.ok(ApiResponse.<EntitlementResponse>builder().message("Đã cập nhật gói người dùng").result(billingService.changePlan(user, request, "admin")).build());
     }
 
     @DeleteMapping("/{id}")

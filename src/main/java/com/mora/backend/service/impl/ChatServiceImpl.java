@@ -45,6 +45,7 @@ public class ChatServiceImpl implements ChatService {
     private final AiServiceClient aiServiceClient;
     private final ChatSummaryHelper chatSummaryHelper;
     private final UserService userService;
+    private final com.mora.backend.service.BillingService billingService;
     private final SimpMessagingTemplate messagingTemplate;
     private final com.mora.backend.service.ChatStateNotifier chatStateNotifier;
     private final ObjectMapper objectMapper = new ObjectMapper();
@@ -63,7 +64,6 @@ public class ChatServiceImpl implements ChatService {
         if (currentUser.getRole() != Role.ROLE_ADMIN && userRole == null) {
             throw new AppException(ErrorCode.UNAUTHORIZED);
         }
-
         ChatMessage userMessage = ChatMessage.builder()
                 .sender("user")
                 .messageType(MessageType.USER_MESSAGE)
@@ -102,6 +102,7 @@ public class ChatServiceImpl implements ChatService {
         if (currentUser.getRole() != Role.ROLE_ADMIN && userRole == null) {
             throw new AppException(ErrorCode.UNAUTHORIZED);
         }
+        if (billingService != null) billingService.requireCanUseAi(space);
 
         // Lấy danh sách tài liệu
         List<Document> documents;
@@ -264,6 +265,7 @@ public class ChatServiceImpl implements ChatService {
         if (currentUser.getRole() != Role.ROLE_ADMIN && getUserRole(space, currentUser) == null) {
             throw new AppException(ErrorCode.UNAUTHORIZED);
         }
+        if (billingService != null) billingService.requireCanUseAi(space);
         String key = streamKey(space.getId(), requestId);
         if (activeStreams.putIfAbsent(key, new AtomicBoolean(false)) != null) {
             throw new AppException(ErrorCode.INVALID_REQUEST_PARAMETER);
